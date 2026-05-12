@@ -108,7 +108,16 @@ export default function App() {
             detailFBmStrength={0.2}
             detailFBmSpeed={1}
           />*/}
-          <OceanTile />
+          <OceanTile
+            carrierWaves={CARRIER_WAVES}
+            secondaryWaves={SECONDARY_WAVES}
+            modulationStrength={0.7}
+            secondaryNoiseScale={0.1}
+            secondaryNoiseStrength={1}
+            detailFBmStrength={0.2}
+            detailFBmSpeed={1}
+            terrainDamping={3.9}
+          />
         </Suspense>
 
         <OrbitControls

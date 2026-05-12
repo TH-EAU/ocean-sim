@@ -23,3 +23,5 @@ uniform vec4 uTerrainBounds;
 uniform float uTerrainDamping;
 
 varying vec3 vWorldPos;
+varying float vTerrainH;
+varying float vSelfShadow;

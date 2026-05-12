@@ -2,37 +2,59 @@ import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stats, Sky } from "@react-three/drei";
 import Ocean from "./components/Ocean";
-import Terrain from "./components/Terrain";
+import Boat from "./components/Boat";
 import type { WaveLayer } from "./types/wave";
+import Terrain from "./components/Terrain";
 
-const WAVES: WaveLayer[] = [
+// Vagues porteuses — longue période, direction du courant
+const CARRIER_WAVES: WaveLayer[] = [
   {
     direction: [1.0, 0.3],
-    amplitude: 0.05,
-    steepness: 1.9,
-    wavelength: 4.0,
+    amplitude: 0.3,
+    steepness: 0.9,
+    wavelength: 20.0,
     speed: 0.2,
     warpStrength: 1,
   },
   {
-    direction: [1.3, 0.3],
-    amplitude: 0.1,
-    steepness: 1.9,
-    wavelength: 4.0,
+    direction: [1.5, 0.8],
+    amplitude: 0.3,
+    steepness: 0.6,
+    wavelength: 15.0,
     speed: 0.2,
-    warpStrength: 5,
+    warpStrength: 1,
   },
   {
-    direction: [1.0, 0.1],
-    amplitude: 0.001,
-    steepness: 1.9,
-    wavelength: 0.5,
-    speed: 0.7,
-    warpStrength: 2,
+    direction: [0.5, 1.2],
+    amplitude: 0.2,
+    steepness: 0.6,
+    wavelength: 15.0,
+    speed: 0.2,
+    warpStrength: 1,
   },
 ];
 
-const SUN_POSITION: [number, number, number] = [100, 30, 100];
+// Vaguelettes — direction du vent, amplitude modulée par les portantes
+const SECONDARY_WAVES: WaveLayer[] = [
+  {
+    direction: [-1.0, -0.3],
+    amplitude: 0.1,
+    steepness: 2.9,
+    wavelength: 5.0,
+    speed: 0.5,
+    warpStrength: 1,
+  },
+  {
+    direction: [-1.5, -0.3],
+    amplitude: 0.05,
+    steepness: 0.9,
+    wavelength: 5.0,
+    speed: 0.2,
+    warpStrength: 1,
+  },
+];
+
+const SUN_POSITION: [number, number, number] = [100, 1, 100];
 
 export default function App() {
   return (
@@ -40,6 +62,7 @@ export default function App() {
       <Canvas
         camera={{ position: [0, 5, 14], fov: 60, near: 0.1, far: 1000 }}
         gl={{ antialias: true }}
+        shadows="soft"
       >
         <Sky
           sunPosition={SUN_POSITION}
@@ -54,13 +77,24 @@ export default function App() {
           position={SUN_POSITION}
           intensity={2.0}
           color="#fff5e0"
-          castShadow={false}
+          castShadow
+          shadow-camera-left={-40}
+          shadow-camera-right={40}
+          shadow-camera-top={40}
+          shadow-camera-bottom={-40}
+          shadow-camera-near={1}
+          shadow-camera-far={400}
+          shadow-mapSize={[2048, 2048]}
+          shadow-bias={-0.002}
         />
 
         <Suspense fallback={null}>
-          <Terrain heightScale={4} terrainDepth={-1} />
+          <Boat position={[0, -0.8, 10]} scale={1} />
+          {/*<Terrain heightScale={4} terrainDepth={-1} />*/}
           <Ocean
-            waves={WAVES}
+            carrierWaves={CARRIER_WAVES}
+            secondaryWaves={SECONDARY_WAVES}
+            modulationStrength={0.7}
             terrainDamping={3.9}
             fresnelStrength={3.9}
             fresnelAlpha={1}
@@ -68,6 +102,10 @@ export default function App() {
             transmission={0.9}
             scatterDensity={8}
             scatterPower={4}
+            secondaryNoiseScale={0.1}
+            secondaryNoiseStrength={1}
+            detailFBmStrength={0.2}
+            detailFBmSpeed={1}
           />
         </Suspense>
 

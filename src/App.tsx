@@ -5,6 +5,7 @@ import Boat from "./components/Boat";
 import type { WaveLayer } from "./types/wave";
 import Terrain from "./components/Terrain";
 import OceanTile from "./components/OceanTile";
+import Test from "./components/Test";
 
 // Vagues porteuses — longue période, direction du courant
 const CARRIER_WAVES: WaveLayer[] = [
@@ -91,6 +92,7 @@ export default function App() {
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
           <Terrain heightScale={4} terrainDepth={-4} />
+          <Test />
           {/*<Ocean
             carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}
@@ -107,7 +109,7 @@ export default function App() {
             detailFBmStrength={0.2}
             detailFBmSpeed={1}
           />*/}
-          <OceanTile
+          {/* <OceanTile
             carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}
             modulationStrength={0.7}
@@ -117,7 +119,7 @@ export default function App() {
             detailFBmSpeed={1}
             terrainDamping={3.9}
             sunDirection={SUN_POSITION}
-          />
+          /> */}
         </Suspense>
 
         <OrbitControls

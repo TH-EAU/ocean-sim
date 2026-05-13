@@ -129,7 +129,7 @@ export default function Ocean({
 
   // Created once — Float32Arrays and textures are stable refs; props synced via useEffect below
   // Spreads THREE.UniformsLib.lights so Three.js can update shadow map uniforms when lights=true
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   const uniforms = useMemo<Record<string, THREE.IUniform>>(() => {
     const allWaves = [...carrierWaves, ...secondaryWaves];
     fillWaveBuffers(allWaves, dirs, amps, steeps, lens, speeds, warps);

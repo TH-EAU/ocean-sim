@@ -46,7 +46,7 @@ const FogPlane = () => {
   }, -1);
 
   const injectShader = (shader: THREE.WebGLProgramParametersWithUniforms) => {
-    // Injection des chunks
+    // Vertex
     shader.vertexShader = shader.vertexShader
       .replace(`#include <common>`, `#include <common>\n${testUniformVert}`)
       .replace(
@@ -54,6 +54,7 @@ const FogPlane = () => {
         `#include <begin_vertex>\n${testVertChunk}`,
       );
 
+    // Fragment
     shader.fragmentShader = shader.fragmentShader
       .replace(
         `#include <common>`,
@@ -64,21 +65,17 @@ const FogPlane = () => {
         `#include <map_fragment>\n${testFragChunk}`,
       );
 
-    // Injection des Uniforms
+    // Uniforms
     shader.uniforms.uDepthTexture = { value: depthRT.depthTexture };
     shader.uniforms.cameraNear = { value: camera.near };
     shader.uniforms.cameraFar = { value: camera.far };
-    shader.uniforms.uMaxDistance = { value: 50.0 }; // Ajuste cette valeur
+    shader.uniforms.uMaxDistance = { value: 50.0 };
   };
 
   return (
     <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
       <planeGeometry args={[60, 60, 256, 256]} />
-      <meshStandardMaterial
-        color="red"
-        transparent={true}
-        onBeforeCompile={injectShader}
-      />
+      <meshStandardMaterial transparent={true} onBeforeCompile={injectShader} />
     </mesh>
   );
 };

@@ -92,6 +92,9 @@ export default function App() {
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
           <Terrain heightScale={4} terrainDepth={-4} />
+          <mesh rotation={[250, 0, 0]}>
+            <planeGeometry args={[60, 60, 256, 256]} />
+          </mesh>
           <Test />
           {/*<Ocean
             carrierWaves={CARRIER_WAVES}

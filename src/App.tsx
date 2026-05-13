@@ -90,7 +90,7 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
-          {/*<Terrain heightScale={4} terrainDepth={-1} />*/}
+          <Terrain heightScale={4} terrainDepth={-4} />
           {/*<Ocean
             carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}

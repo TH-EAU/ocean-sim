@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stats, Sky } from "@react-three/drei";
-import Ocean from "./components/Ocean";
 import Boat from "./components/Boat";
 import type { WaveLayer } from "./types/wave";
 import Terrain from "./components/Terrain";
@@ -19,7 +18,7 @@ const CARRIER_WAVES: WaveLayer[] = [
   },
   {
     direction: [1.5, 0.8],
-    amplitude: 0.3,
+    amplitude: 0.9,
     steepness: 0.6,
     wavelength: 15.0,
     speed: 0.2,
@@ -55,7 +54,7 @@ const SECONDARY_WAVES: WaveLayer[] = [
   },
 ];
 
-const SUN_POSITION: [number, number, number] = [100, 10, 100];
+const SUN_POSITION: [number, number, number] = [100, 30, 100];
 
 export default function App() {
   return (
@@ -91,7 +90,7 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
-          <Terrain heightScale={4} terrainDepth={-1} />
+          {/*<Terrain heightScale={4} terrainDepth={-1} />*/}
           {/*<Ocean
             carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}
@@ -117,6 +116,7 @@ export default function App() {
             detailFBmStrength={0.2}
             detailFBmSpeed={1}
             terrainDamping={3.9}
+            sunDirection={SUN_POSITION}
           />
         </Suspense>
 

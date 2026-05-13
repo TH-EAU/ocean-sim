@@ -73,8 +73,6 @@ ddz . y += D . y * A * w * cosP;
 ddz . z += - D . y * D . y * A * Q * w * sinP;
 }
 
-vSelfShadow = ampSum > 0.0 ? clamp(displaced.y/ampSum, -1.0, 1.0): 0.0 ;
-
 if ( uDetailFBmStrength > 0.0 ) {
 vec2 detailUV = xz * uDetailFBmScale + uDetailWindDir * uTime * uDetailFBmSpeed;
 displaced . y += uDetailFBmStrength * fbmDetail(detailUV);
@@ -88,7 +86,10 @@ ddx . y += uDetailFBmStrength * dy_dx;
 ddz . y += uDetailFBmStrength * dy_dz;
 }
 
-vNormal = normalize(cross(ddz, ddx));
+vec3 worldNormal = normalize(cross(ddz, ddx));
+#ifdef OCEAN_USE_NORMALS
+vNormal = normalize(mat3(viewMatrix) * worldNormal);
+#endif
 vWorldPos = displaced;
 vTerrainH = h;
 

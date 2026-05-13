@@ -1,17 +1,21 @@
-import { useRef, useMemo, useEffect } from "react";
+import { useRef, useMemo, useEffect, useCallback } from "react";
 import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
 import type { WaveLayer } from "../types/wave";
-import waterUniformsChunk from "./shaders/chunks/oceanUniforms.vert.chunk.glsl";
-import waterHelpersChunk from "./shaders/chunks/oceanHelpers.vert.chunk.glsl";
-import waterVertexChunk from "./shaders/chunks/ocean.vert.chunk.glsl";
+import waterUniformsChunk from "./shaders/chunks/oceanUniforms.vert.chunk.glsl?raw";
+import waterHelpersChunk from "./shaders/chunks/oceanHelpers.vert.chunk.glsl?raw";
+import waterVertexChunk from "./shaders/chunks/ocean.vert.chunk.glsl?raw";
+import waterColorChunk from "./shaders/chunks/oceanColor.frag.chunk.glsl?raw";
 import heightmapUrl from "../assets/heightmap.png?url";
+
+import normalMapUrl from "../assets/Water 0341normal.jpg?url";
 
 const MAX_WAVES = 8;
 const TERRAIN_BOUNDS = new THREE.Vector4(-30, -30, 30, 30);
 const DEFAULT_WIND_DIR: [number, number] = [-0.8, -0.8];
+const DEFAULT_SUN_DIR: [number, number, number] = [100, 10, 100];
 const EMPTY_WAVES: WaveLayer[] = [];
 
 function fillWaveBuffers(
@@ -52,6 +56,10 @@ interface OceanTileProps {
   detailFBmSpeed?: number;
   detailWindDir?: [number, number];
   terrainDamping?: number;
+  sunDirection?: [number, number, number];
+  normalStrength?: number;
+  normalScale?: number;
+  normalWarp?: number;
 }
 
 const OceanTile = ({
@@ -65,8 +73,18 @@ const OceanTile = ({
   detailFBmSpeed = 0.04,
   detailWindDir = DEFAULT_WIND_DIR,
   terrainDamping = 0.9,
+  sunDirection = DEFAULT_SUN_DIR,
+  normalStrength = 0.4,
+  normalScale = 0.5,
+  normalWarp = 0.25,
 }: OceanTileProps) => {
   const meshRef = useRef<THREE.Mesh>(null);
+
+  const normalMap = useTexture(normalMapUrl, (tex) => {
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.minFilter = THREE.LinearMipmapLinearFilter;
+    tex.needsUpdate = true;
+  });
 
   const heightmap = useTexture(heightmapUrl, (tex) => {
     tex.minFilter = THREE.LinearFilter;
@@ -112,39 +130,58 @@ const OceanTile = ({
       uHeightmap: { value: heightmap },
       uTerrainBounds: { value: TERRAIN_BOUNDS },
       uTerrainDamping: { value: terrainDamping },
+      uSunDirection: {
+        value: new THREE.Vector3(
+          sunDirection[0],
+          sunDirection[1],
+          sunDirection[2],
+        ).normalize(),
+      },
+      uNormalMap: { value: normalMap },
+      uNormalStrength: { value: normalStrength },
+      uNormalScale: { value: normalScale },
+      uNormalWarp: { value: normalWarp },
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const injectShader = (shader: THREE.WebGLProgramParametersWithUniforms) => {
-    Object.assign(shader.uniforms, customUniforms);
+  const applyVertexChunk = useCallback(
+    (shader: THREE.WebGLProgramParametersWithUniforms) => {
+      Object.assign(shader.uniforms, customUniforms);
+      shader.vertexShader = (`#define MAX_WAVES ${MAX_WAVES}\n` + shader.vertexShader)
+        .replace(
+          `#include <common>`,
+          `#include <common>\n${waterUniformsChunk}\n${waterHelpersChunk}`,
+        )
+        .replace(`#include <begin_vertex>`, waterVertexChunk);
+    },
+    [customUniforms],
+  );
 
-    shader.vertexShader = (
-      `#define MAX_WAVES ${MAX_WAVES}\n` + shader.vertexShader
-    )
-      .replace(
-        `#include <common>`,
-        `#include <common>\n${waterUniformsChunk}\n${waterHelpersChunk}`,
-      )
-      .replace(`#include <begin_vertex>`, waterVertexChunk);
-    // Debug
-    console.log(
-      shader.vertexShader
-        .split("\n")
-        .map((line, i) => `${String(i + 1).padStart(3, " ")} | ${line}`)
-        .join("\n"),
-    );
-  };
+  const injectShader = useCallback(
+    (shader: THREE.WebGLProgramParametersWithUniforms) => {
+      applyVertexChunk(shader);
+      shader.vertexShader = `#define OCEAN_USE_NORMALS\n` + shader.vertexShader;
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          `#include <common>`,
+          `#include <common>\nuniform vec3 uSunDirection;\nvarying vec3 vWorldPos;`,
+        )
+        .replace(
+          `#include <map_fragment>`,
+          `#include <map_fragment>\n${waterColorChunk}`,
+        );
+    },
+    [customUniforms, applyVertexChunk],
+  );
 
   const depthMaterial = useMemo(() => {
     const mat = new THREE.MeshDepthMaterial({
       depthPacking: THREE.RGBADepthPacking,
     });
-    mat.onBeforeCompile = injectShader;
+    mat.onBeforeCompile = applyVertexChunk;
     mat.customProgramCacheKey = () => `ocean-depth-${MAX_WAVES}`;
     return mat;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [applyVertexChunk]);
 
   // Sync waves
   useEffect(() => {
@@ -191,6 +228,18 @@ const OceanTile = ({
   useEffect(() => {
     customUniforms.uTerrainDamping.value = terrainDamping;
   }, [terrainDamping, customUniforms]);
+
+  useEffect(() => {
+    customUniforms.uSunDirection.value
+      .set(sunDirection[0], sunDirection[1], sunDirection[2])
+      .normalize();
+  }, [sunDirection, customUniforms]);
+
+  useEffect(() => {
+    customUniforms.uNormalStrength.value = normalStrength;
+    customUniforms.uNormalScale.value = normalScale;
+    customUniforms.uNormalWarp.value = normalWarp;
+  }, [normalStrength, normalScale, normalWarp, customUniforms]);
 
   useFrame(({ clock }) => {
     customUniforms.uTime.value = clock.getElapsedTime();

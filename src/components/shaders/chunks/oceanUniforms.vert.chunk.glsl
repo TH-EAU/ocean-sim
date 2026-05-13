@@ -22,6 +22,12 @@ uniform sampler2D uHeightmap;
 uniform vec4 uTerrainBounds;
 uniform float uTerrainDamping;
 
+uniform vec3 uSunDirection;
+
 varying vec3 vWorldPos;
 varying float vTerrainH;
-varying float vSelfShadow;
+
+uniform sampler2D uNormalMap;
+uniform float uNormalStrength;
+uniform float uNormalScale;
+uniform float uNormalWarp;

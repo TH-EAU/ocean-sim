@@ -5,7 +5,11 @@ import { useTexture } from "@react-three/drei";
 
 import heightmapUrl from "../../assets/heightmap.jpg";
 
-import { applyFragmentChunk, applyVertexChunk, handleDepthMaterial } from "./oceanUtils/shaders";
+import {
+  applyFragmentChunk,
+  applyVertexChunk,
+  handleDepthMaterial,
+} from "./oceanUtils/shaders";
 
 interface OceanTileProps {
   sharedDepthRT: THREE.WebGLRenderTarget;
@@ -43,39 +47,56 @@ const OceanTile = ({
 
   const heightmap = useTexture(heightmapUrl);
 
-  const uniforms = useMemo(() => ({
-    uTime: { value: 0 },
-    uWindDir: { value: new THREE.Vector2(...windDirection) },
-    uWindSpeed: { value: windSpeed },
-    uCurrentDir: { value: new THREE.Vector2(...currentDirection) },
-    uCurrentSpeed: { value: currentSpeed },
-    uWaveAmplitude: { value: disturbtion },
-    uInnerHalfSize: { value: innerHalfSize },
-    uTileOffset: { value: new THREE.Vector2(...tileOffset) },
-    uLodLevel: { value: lodLevel },
-    uResolution: { value: new THREE.Vector2(gl.getSize(new THREE.Vector2()).x, gl.getSize(new THREE.Vector2()).y) },
-    uHeightmap: { value: heightmap },
-    uTerrainBounds: { value: new THREE.Vector4(-30, -30, 30, 30) },
-    uHeightScale: { value: 10 },
-    uTerrainDepth: { value: -4 },
-    uMaxDepth: { value: 5.0 },
-    uDepthTexture: { value: sharedDepthRT.depthTexture },
-    uDepthScale: { value: 5.1 },
-    uDepthFade: { value: 0.1 },
-    cameraNear: { value: 0.1 },
-    cameraFar: { value: 10000 },
-    uSceneColor: { value: sharedDepthRT.texture },
-    uReflectionStrength: { value: 0.05 },
-    uReflectionBlend: { value: 0.4 },
-    uSunDirection: { value: new THREE.Vector3(0.6, 0.3, 0.7).normalize() },
-    uFresnelPower: { value: 5.0 },
-    uSpecularPower: { value: 512.0 },
-    uSpecularIntensity: { value: 2.0 },
-  }), [
-    windDirection, windSpeed, currentDirection, currentSpeed, disturbtion, innerHalfSize, lodLevel,
-    gl, heightmap, sharedDepthRT
-    // tileOffset intentionally excluded — updated in-place below
-  ]);
+  const uniforms = useMemo(
+    () => ({
+      uTime: { value: 0 },
+      uWindDir: { value: new THREE.Vector2(...windDirection) },
+      uWindSpeed: { value: windSpeed },
+      uCurrentDir: { value: new THREE.Vector2(...currentDirection) },
+      uCurrentSpeed: { value: currentSpeed },
+      uWaveAmplitude: { value: disturbtion },
+      uInnerHalfSize: { value: innerHalfSize },
+      uTileOffset: { value: new THREE.Vector2(...tileOffset) },
+      uLodLevel: { value: lodLevel },
+      uResolution: {
+        value: new THREE.Vector2(
+          gl.getSize(new THREE.Vector2()).x,
+          gl.getSize(new THREE.Vector2()).y,
+        ),
+      },
+      uHeightmap: { value: heightmap },
+      uTerrainHeight: { value: heightmap },
+      uTerrainBounds: { value: new THREE.Vector4(-30, -30, 30, 30) },
+      uHeightScale: { value: 10 },
+      uTerrainDepth: { value: -4 },
+      uMaxDepth: { value: 5.0 },
+      uDepthTexture: { value: sharedDepthRT.depthTexture },
+      uDepthScale: { value: 1.1 },
+      uDepthFade: { value: 0.1 },
+      cameraNear: { value: 0.1 },
+      cameraFar: { value: 10000 },
+      uSceneColor: { value: sharedDepthRT.texture },
+      uReflectionStrength: { value: 0.05 },
+      uReflectionBlend: { value: 0.4 },
+      uSunDirection: { value: new THREE.Vector3(0.6, 0.3, 0.7).normalize() },
+      uFresnelPower: { value: 5.0 },
+      uSpecularPower: { value: 512.0 },
+      uSpecularIntensity: { value: 2.0 },
+    }),
+    [
+      windDirection,
+      windSpeed,
+      currentDirection,
+      currentSpeed,
+      disturbtion,
+      innerHalfSize,
+      lodLevel,
+      gl,
+      heightmap,
+      sharedDepthRT,
+      // tileOffset intentionally excluded — updated in-place below
+    ],
+  );
 
   useEffect((): any => {
     oceanUniformsStore.set(id, uniforms);
@@ -89,15 +110,15 @@ const OceanTile = ({
 
   const injectShader = useCallback(
     (shader: THREE.WebGLProgramParametersWithUniforms) => {
-      applyVertexChunk(shader, uniforms)
-      applyFragmentChunk(shader)
+      applyVertexChunk(shader, uniforms);
+      applyFragmentChunk(shader);
     },
     [uniforms],
   );
 
   const depthMaterial = useMemo(
     () => handleDepthMaterial(uniforms),
-    [uniforms]
+    [uniforms],
   );
 
   useFrame((state) => {
@@ -108,8 +129,8 @@ const OceanTile = ({
       storedUniforms.uResolution.value.set(size.width, size.height);
       storedUniforms.cameraNear.value = state.camera.near;
       storedUniforms.cameraFar.value = state.camera.far;
-    };
-  })
+    }
+  });
 
   return (
     <mesh
@@ -132,6 +153,6 @@ const OceanTile = ({
       />
     </mesh>
   );
-}
+};
 
 export default OceanTile;

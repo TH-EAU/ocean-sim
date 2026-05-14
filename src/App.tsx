@@ -5,6 +5,7 @@ import Boat from "./components/Boat";
 import type { WaveLayer } from "./types/wave";
 import Terrain from "./components/Terrain";
 import OceanGrid from "./components/ocean/OceanGrid";
+import AbsorbTest from "./components/AbsorbTest";
 
 // Vagues porteuses — longue période, direction du courant
 const CARRIER_WAVES: WaveLayer[] = [
@@ -90,7 +91,8 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
-          <Terrain heightScale={4} terrainDepth={-2} />
+          <Terrain heightScale={14} terrainDepth={-8} />
+          {/* <AbsorbTest /> */}
           {/*<Ocean
             carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}

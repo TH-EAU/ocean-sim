@@ -157,8 +157,8 @@ const OceanTile = ({
       uNormalScale: { value: normalScale },
       uNormalWarp: { value: normalWarp },
       uDepthTexture: { value: null as THREE.Texture | null },
-      uDepthFade: { value: 0.5 },
-      uDepthScale: { value: 5.0 },
+      uDepthFade: { value: 5.5 },
+      uDepthScale: { value: 0.1 },
       uResolution: { value: new THREE.Vector2(1, 1) },
       cameraNear: { value: 0.1 },
       cameraFar: { value: 1000 },
@@ -187,7 +187,7 @@ const OceanTile = ({
       shader.fragmentShader = shader.fragmentShader
         .replace(
           `#include <common>`,
-          `#include <common>\nuniform vec3 uSunDirection;\nuniform sampler2D uDepthTexture;\nuniform float uDepthFade;\nuniform float uDepthScale;\nuniform vec2 uResolution;\nuniform float cameraNear;\nuniform float cameraFar;\nuniform sampler2D uNormalMap;\nuniform float uNormalStrength;\nuniform float uNormalScale;\nuniform float uNormalWarp;\nuniform float uTime;\nvarying vec3 vWorldPos;\n${colorHelpersChunk}`,
+          `#include <common>\nuniform float uTerrainDamping;\nuniform vec3 uSunDirection;\nuniform sampler2D uDepthTexture;\nuniform float uDepthFade;\nuniform float uDepthScale;\nuniform vec2 uResolution;\nuniform float cameraNear;\nuniform float cameraFar;\nuniform sampler2D uNormalMap;\nuniform float uNormalStrength;\nuniform float uNormalScale;\nuniform float uNormalWarp;\nuniform float uTime;\nvarying vec3 vWorldPos;\n${colorHelpersChunk}`,
         )
         .replace(
           `#include <map_fragment>`,

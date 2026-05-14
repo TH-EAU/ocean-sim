@@ -18,7 +18,7 @@ vec3 V      = normalize(cameraPosition - vWorldPos);
 // Fresnel (Schlick)
 const float R0 = 0.02;
 float NdotV = clamp(dot(waterNormal, V), 0.0, 1.0);
-float fresnel = R0 + (1.0 - R0) * pow(1.0 - NdotV, 5.0);
+float fresnel = R0 + (1.0 - R0) * pow(5.0 - NdotV, 10.0);
 
 // Réflexion du ciel procédural sur la normale perturbée
 vec3 R       = reflect(-V, waterNormal);
@@ -35,10 +35,12 @@ float sceneRawDepth = texture2D(uDepthTexture, screenUV).r;
 float sceneLinear   = linearizeDepth(sceneRawDepth);
 float fragLinear    = linearizeDepth(gl_FragCoord.z);
 float depthDiff     = sceneLinear - fragLinear;
-float t             = clamp(depthDiff / uDepthScale, 0.0, 1.0);
+float t             = clamp(depthDiff / uDepthScale, 0.0, uTerrainDamping);
 float edgeFade      = smoothstep(0.0, uDepthFade, depthDiff);
 
 vec4 water    = waterGradient(t);
 vec3 litColor = mix(water.rgb * (0.6 + 0.4 * light), skyRefl, fresnel) + sunGlint;
 
-diffuseColor = vec4(litColor, water.a * edgeFade);
+
+
+diffuseColor = vec4(water.rgb, water.a * edgeFade);

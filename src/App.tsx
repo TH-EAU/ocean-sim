@@ -90,7 +90,7 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
-          <Terrain heightScale={4} terrainDepth={-4} />
+          <Terrain heightScale={4} terrainDepth={-3} />
           {/*<Ocean
             carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}
@@ -108,12 +108,12 @@ export default function App() {
             detailFBmSpeed={1}
           />*/}
           <OceanTile
-            carrierWaves={CARRIER_WAVES}
+            // carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}
             modulationStrength={0.7}
             secondaryNoiseScale={0.1}
             secondaryNoiseStrength={1}
-            detailFBmStrength={0.2}
+            detailFBmStrength={0.1}
             detailFBmSpeed={1}
             terrainDamping={3.9}
             sunDirection={SUN_POSITION}

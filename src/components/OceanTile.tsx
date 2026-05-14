@@ -9,7 +9,7 @@ import waterHelpersChunk from "./shaders/chunks/oceanHelpers.vert.chunk.glsl?raw
 import waterVertexChunk from "./shaders/chunks/ocean.vert.chunk.glsl?raw";
 import waterColorChunk from "./shaders/chunks/oceanColor.frag.chunk.glsl?raw";
 import colorHelpersChunk from "./shaders/chunks/oceanColorHelpers.frag.chunk.glsl?raw";
-import heightmapUrl from "../assets/heightmap.png?url";
+import heightmapUrl from "../assets/heightmap.jpg?url";
 
 import normalMapUrl from "../assets/waterNormal.jpg?url";
 

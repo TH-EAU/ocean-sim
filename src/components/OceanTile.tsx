@@ -4,13 +4,13 @@ import { useTexture } from "@react-three/drei";
 import * as THREE from "three";
 
 import type { WaveLayer } from "../types/wave";
-import waterUniformsChunk from "./shaders/chunks/oceanUniforms.vert.chunk.glsl?raw";
-import waterHelpersChunk from "./shaders/chunks/oceanHelpers.vert.chunk.glsl?raw";
-import waterVertexChunk from "./shaders/chunks/ocean.vert.chunk.glsl?raw";
-import waterColorChunk from "./shaders/chunks/oceanColor.frag.chunk.glsl?raw";
-import colorHelpersChunk from "./shaders/chunks/oceanColorHelpers.frag.chunk.glsl?raw";
-import heightmapUrl from "../assets/heightmap.png?url";
-
+import waterUniformsChunk from "./shaders/chunks/vertex/oceanUniforms.vert.chunk.glsl?raw";
+import waterHelpersChunk from "./shaders/chunks/vertex/oceanHelpers.vert.chunk.glsl?raw";
+import waterVertexChunk from "./shaders/chunks/vertex/ocean.vert.chunk.glsl?raw";
+import fragUniformsChunk from "./shaders/chunks/fragment/oceanUniforms.frag.chunk.glsl?raw";
+import fragHelpersChunk from "./shaders/chunks/fragment/oceanHelpers.frag.chunk.glsl?raw";
+import waterColorChunk from "./shaders/chunks/fragment/ocean.frag.chunk.glsl?raw";
+import heightmapUrl from "../assets/heightmap.jpg?url";
 import normalMapUrl from "../assets/waterNormal.jpg?url";
 
 const MAX_WAVES = 8;
@@ -58,11 +58,13 @@ interface OceanTileProps {
   detailWindDir?: [number, number];
   terrainDamping?: number;
   depthFade?: number;
-  depthScale?: number;
+  maxDepth?: number;
+  absorption?: number;
   sunDirection?: [number, number, number];
   normalStrength?: number;
   normalScale?: number;
   normalWarp?: number;
+  depthTexRef: React.MutableRefObject<THREE.DepthTexture | null>;
 }
 
 const OceanTile = ({
@@ -76,24 +78,17 @@ const OceanTile = ({
   detailFBmSpeed = 0.04,
   detailWindDir = DEFAULT_WIND_DIR,
   terrainDamping = 0.9,
-  depthFade = 0.5,
-  depthScale = 5.0,
+  depthFade = 1.5,
+  maxDepth = 8.0,
+  absorption = 0.35,
   sunDirection = DEFAULT_SUN_DIR,
   normalStrength = 0.4,
   normalScale = 0.5,
   normalWarp = 0.25,
+  depthTexRef,
 }: OceanTileProps) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const { gl, scene, size } = useThree();
-
-  const depthRT = useMemo(() => {
-    const dt = new THREE.DepthTexture(0, 0);
-    dt.type = THREE.UnsignedShortType;
-    return new THREE.WebGLRenderTarget(0, 0, {
-      depthTexture: dt,
-      depthBuffer: true,
-    });
-  }, []);
+  const { camera } = useThree();
 
   const normalMap = useTexture(normalMapUrl, (tex) => {
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
@@ -119,7 +114,6 @@ const OceanTile = ({
   const speeds = useMemo(() => new Float32Array(MAX_WAVES), []);
   const warps = useMemo(() => new Float32Array(MAX_WAVES), []);
 
-  // Uniforms stables partagés entre meshStandardMaterial et depthMaterial
   const customUniforms = useMemo(() => {
     const allWaves = [...carrierWaves, ...secondaryWaves];
     fillWaveBuffers(allWaves, dirs, amps, steeps, lens, speeds, warps);
@@ -156,12 +150,17 @@ const OceanTile = ({
       uNormalStrength: { value: normalStrength },
       uNormalScale: { value: normalScale },
       uNormalWarp: { value: normalWarp },
-      uDepthTexture: { value: null as THREE.Texture | null },
-      uDepthFade: { value: 0.5 },
-      uDepthScale: { value: 5.0 },
-      uResolution: { value: new THREE.Vector2(1, 1) },
-      cameraNear: { value: 0.1 },
-      cameraFar: { value: 1000 },
+      uFresnelStrenght: { value: 0.8 },
+      uSceneDepth: { value: null as THREE.Texture | null },
+      uInvProjView: { value: new THREE.Matrix4() },
+      uDepthFade: { value: depthFade },
+      uMaxDepth: { value: maxDepth },
+      uAbsorption: { value: absorption },
+      uShallowColor: { value: new THREE.Color(0x1ab5a0) },
+      uDeepColor: { value: new THREE.Color(0x071428) },
+      uCameraPos: { value: new THREE.Vector3() },
+      uNear: { value: camera.near },
+      uFar: { value: camera.far },
     };
   }, []);
 
@@ -173,7 +172,7 @@ const OceanTile = ({
       )
         .replace(
           `#include <common>`,
-          `#include <common>\n${waterUniformsChunk}\n${waterHelpersChunk}`,
+          `#include <common>\nvarying float vDepth;\nvarying vec2 vScreenUV;\n${waterUniformsChunk}\n${waterHelpersChunk}`,
         )
         .replace(`#include <begin_vertex>`, waterVertexChunk);
     },
@@ -183,15 +182,19 @@ const OceanTile = ({
   const injectShader = useCallback(
     (shader: THREE.WebGLProgramParametersWithUniforms) => {
       applyVertexChunk(shader);
-      shader.vertexShader = `#define OCEAN_USE_NORMALS\n` + shader.vertexShader;
+      shader.vertexShader = (`#define OCEAN_USE_NORMALS\n` + shader.vertexShader)
+        .replace(
+          `#include <project_vertex>`,
+          `#include <project_vertex>\nvScreenUV = (gl_Position.xy / gl_Position.w) * 0.5 + 0.5;`,
+        );
       shader.fragmentShader = shader.fragmentShader
         .replace(
           `#include <common>`,
-          `#include <common>\nuniform vec3 uSunDirection;\nuniform sampler2D uDepthTexture;\nuniform float uDepthFade;\nuniform float uDepthScale;\nuniform vec2 uResolution;\nuniform float cameraNear;\nuniform float cameraFar;\nuniform sampler2D uNormalMap;\nuniform float uNormalStrength;\nuniform float uNormalScale;\nuniform float uNormalWarp;\nuniform float uTime;\nvarying vec3 vWorldPos;\n${colorHelpersChunk}`,
+          `#include <common>\nvarying vec2 vScreenUV;\n${fragUniformsChunk}\n${fragHelpersChunk}`,
         )
         .replace(
-          `#include <map_fragment>`,
-          `#include <map_fragment>\n${waterColorChunk}`,
+          `#include <color_fragment>`,
+          `#include <color_fragment>\n${waterColorChunk}`,
         );
     },
     [customUniforms, applyVertexChunk],
@@ -206,7 +209,6 @@ const OceanTile = ({
     return mat;
   }, [applyVertexChunk]);
 
-  // Sync waves
   useEffect(() => {
     const allWaves = [...carrierWaves, ...secondaryWaves];
     fillWaveBuffers(allWaves, dirs, amps, steeps, lens, speeds, warps);
@@ -254,8 +256,9 @@ const OceanTile = ({
 
   useEffect(() => {
     customUniforms.uDepthFade.value = depthFade;
-    customUniforms.uDepthScale.value = depthScale;
-  }, [depthFade, depthScale, customUniforms]);
+    customUniforms.uMaxDepth.value = maxDepth;
+    customUniforms.uAbsorption.value = absorption;
+  }, [depthFade, maxDepth, absorption, customUniforms]);
 
   useEffect(() => {
     customUniforms.uSunDirection.value
@@ -270,32 +273,22 @@ const OceanTile = ({
   }, [normalStrength, normalScale, normalWarp, customUniforms]);
 
   useEffect(() => {
-    customUniforms.uDepthTexture.value = depthRT.depthTexture;
-    return () => depthRT.dispose();
-  }, [depthRT, customUniforms]);
-
-  useEffect(() => {
-    const w = Math.floor(size.width * gl.getPixelRatio());
-    const h = Math.floor(size.height * gl.getPixelRatio());
-    depthRT.setSize(w, h);
-    customUniforms.uResolution.value.set(w, h);
-  }, [size.width, size.height, gl, depthRT, customUniforms]);
-
-  useFrame(({ camera }) => {
-    if (!meshRef.current) return;
-    meshRef.current.visible = false;
-    gl.setRenderTarget(depthRT);
-    gl.clear();
-    gl.render(scene, camera);
-    gl.setRenderTarget(null);
-    meshRef.current.visible = true;
-  }, -1);
+    if (meshRef.current) {
+      meshRef.current.layers.set(1);
+    }
+  }, []);
 
   useFrame(({ clock, camera }) => {
     customUniforms.uTime.value = clock.getElapsedTime();
-    if (camera instanceof THREE.PerspectiveCamera) {
-      customUniforms.cameraNear.value = camera.near;
-      customUniforms.cameraFar.value = camera.far;
+    customUniforms.uInvProjView.value
+      .copy(camera.projectionMatrix)
+      .multiply(camera.matrixWorldInverse)
+      .invert();
+    customUniforms.uCameraPos.value.setFromMatrixPosition(camera.matrixWorld);
+    customUniforms.uNear.value = camera.near;
+    customUniforms.uFar.value = camera.far;
+    if (depthTexRef.current) {
+      customUniforms.uSceneDepth.value = depthTexRef.current;
     }
   });
 
@@ -312,8 +305,8 @@ const OceanTile = ({
         onBeforeCompile={injectShader}
         customProgramCacheKey={() => `ocean-${MAX_WAVES}`}
         transparent
-        roughness={0}
-        depthWrite={true}
+        depthWrite={false}
+        depthTest
         side={THREE.FrontSide}
       />
     </mesh>

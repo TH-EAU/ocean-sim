@@ -1,10 +1,12 @@
-import { Suspense } from "react";
+import { Suspense, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stats, Sky } from "@react-three/drei";
+import * as THREE from "three";
 import Boat from "./components/Boat";
 import type { WaveLayer } from "./types/wave";
 import Terrain from "./components/Terrain";
 import OceanTile from "./components/OceanTile";
+import SceneDepthCapture from "./components/SceneDepthCapture";
 
 // Vagues porteuses — longue période, direction du courant
 const CARRIER_WAVES: WaveLayer[] = [
@@ -57,6 +59,8 @@ const SECONDARY_WAVES: WaveLayer[] = [
 const SUN_POSITION: [number, number, number] = [100, 30, 100];
 
 export default function App() {
+  const depthTexRef = useRef<THREE.DepthTexture | null>(null);
+
   return (
     <div style={{ width: "100vw", height: "100vh" }}>
       <Canvas
@@ -64,6 +68,8 @@ export default function App() {
         gl={{ antialias: true }}
         shadows="soft"
       >
+        <SceneDepthCapture depthTexRef={depthTexRef} />
+
         <Sky
           sunPosition={SUN_POSITION}
           turbidity={6}
@@ -72,7 +78,7 @@ export default function App() {
           mieDirectionalG={0.85}
         />
 
-        <ambientLight intensity={0.3} color="#1a2a4a" />
+        <ambientLight intensity={10} color="#1a2a4a" />
         <directionalLight
           position={SUN_POSITION}
           intensity={2.0}
@@ -90,24 +96,9 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
-          <Terrain heightScale={4} terrainDepth={-4} />
-          {/*<Ocean
-            carrierWaves={CARRIER_WAVES}
-            secondaryWaves={SECONDARY_WAVES}
-            modulationStrength={0.7}
-            terrainDamping={3.9}
-            fresnelStrength={3.9}
-            fresnelAlpha={1}
-            waterDensity={1}
-            transmission={0.9}
-            scatterDensity={8}
-            scatterPower={4}
-            secondaryNoiseScale={0.1}
-            secondaryNoiseStrength={1}
-            detailFBmStrength={0.2}
-            detailFBmSpeed={1}
-          />*/}
+          <Terrain heightScale={4} terrainDepth={-3} />
           <OceanTile
+            depthTexRef={depthTexRef}
             carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}
             modulationStrength={0.7}
@@ -117,6 +108,7 @@ export default function App() {
             detailFBmSpeed={1}
             terrainDamping={3.9}
             sunDirection={SUN_POSITION}
+            normalScale={0.1}
           />
         </Suspense>
 

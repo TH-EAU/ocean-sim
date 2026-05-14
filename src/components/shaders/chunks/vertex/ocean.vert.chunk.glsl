@@ -15,6 +15,11 @@ vec2 noiseWarp2D = vec2(
         valueNoise(xz * warpFreq + vec2(64.2, 17.8) + uTime * 0.006)
     ) * 2.0 - 1.0;
 
+vec2 noiseWarp2D2 = vec2(
+        valueNoise(xz * warpFreq + vec2(35.4, 52.6) + uTime * 0.016),
+        valueNoise(xz * warpFreq + vec2(41.2, 56.8) + uTime * 0.008)
+    ) * 2.0 - 1.0;
+
 float carrierY = 0.0;
 float carrierAmpSum = 0.0;
 for ( int i = 0; i < MAX_WAVES; i ++ ) {
@@ -53,7 +58,7 @@ float w = 6.28318 / L;
 float spd = sqrt(9.81 / w) * uWaveSpeeds[i];
 
 vec2 xzW = isSecondary
-    ? xz + noiseWarp2D * uWaveWarpStrengths[i] : warpedXZ(i, xz);
+    ? xz + (noiseWarp2D * noiseWarp2D2) * uWaveWarpStrengths[i] : warpedXZ(i, xz);
 
 float phase = dot(D, xzW) * w + uTime * spd;
 float sinP = sin(phase);
@@ -88,7 +93,7 @@ ddz . y += uDetailFBmStrength * dy_dz;
 
 vec3 worldNormal = normalize(cross(ddz, ddx));
 #ifdef OCEAN_USE_NORMALS
-vNormal = normalize(mat3(viewMatrix) * worldNormal);
+vNormal = normalize(mat3(viewMatrix)*worldNormal);
 #endif
 vWorldPos = displaced;
 vTerrainH = h;

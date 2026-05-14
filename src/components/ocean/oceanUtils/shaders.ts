@@ -11,23 +11,26 @@ import vertHelpers from "../shaders/vertex/oceanHelpers.vert.chunk.glsl?raw"
 import { MAX_WAVES } from "../oceanConsts";
 
 
-export const applyVertexChunk = (shader: THREE.WebGLProgramParametersWithUniforms, customUniforms: object) => {
-    Object.assign(shader.uniforms, customUniforms);
-    shader.vertexShader = (
-        `#define OCEAN_USE_NORMALS\n#define MAX_WAVES ${MAX_WAVES}\n` + shader.vertexShader
-    )
+export const applyVertexChunk = (shader: THREE.WebGLProgramParametersWithUniforms, uniforms: object, useNormals = true) => {
+    Object.assign(shader.uniforms, uniforms);
+    const defines = `#define MAX_WAVES ${MAX_WAVES}\n` + (useNormals ? `#define OCEAN_USE_NORMALS\n` : ``);
+    shader.vertexShader = (defines + shader.vertexShader)
         .replace(
             `#include <common>`,
             `#include <common>\n${vertUniform}\n${vertHelpers}`,
         )
-        .replace(`#include <begin_vertex>`, vertex);
+        .replace(`#include <begin_vertex>`, `#include <begin_vertex>\n${vertex}`);
 }
+
+
+
+
 
 export const applyFragmentChunk = (shader: THREE.WebGLProgramParametersWithUniforms) => {
     shader.fragmentShader = shader.fragmentShader
         .replace(
             `#include <common>`,
-            `#include <common>${fragUniforms}\n${fragHelpers}`,
+            `#include <common>\n${fragUniforms}\n${fragHelpers}`,
         )
         .replace(
             `#include <map_fragment>`,
@@ -35,11 +38,14 @@ export const applyFragmentChunk = (shader: THREE.WebGLProgramParametersWithUnifo
         );
 }
 
-export const handleDepthMaterial = () => {
+
+export const handleDepthMaterial = (uniforms: Record<string, THREE.IUniform>) => {
     const mat = new THREE.MeshDepthMaterial({
         depthPacking: THREE.RGBADepthPacking,
     });
-    mat.onBeforeCompile = applyVertexChunk; // ici j'ai retiré Object.assign(shader.uniforms, customUniforms); si les ombres portées des vagues ne marchent plus il faut le remettre
+    mat.onBeforeCompile = (shader) => {
+        applyVertexChunk(shader, uniforms, false);
+    };
     mat.customProgramCacheKey = () => `ocean-depth-${MAX_WAVES}`;
     return mat;
 }

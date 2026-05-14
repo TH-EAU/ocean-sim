@@ -47,8 +47,9 @@ export default function Terrain({
   }), [heightmap, heightScale, terrainDepth, waterLine, fogColor, fogDensity]);
 
   return (
-    <mesh rotation={[-Math.PI / 2, 0, 0]}>
-      <planeGeometry args={[60, 60, 256, 256]} />
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={new THREE.Vector3(-1, -2, -3)} receiveShadow >
+      <planeGeometry args={[160, 160, 256, 256]} />
+      {/* <meshStandardMaterial /> */}
       <shaderMaterial
         vertexShader={vertexShader}
         fragmentShader={fragmentShader}

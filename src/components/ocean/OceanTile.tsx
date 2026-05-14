@@ -1,247 +1,130 @@
 import * as THREE from "three";
-import { useRef, useMemo, useEffect, useCallback } from "react";
+import { useMemo, useEffect, useCallback } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 
-import type { WaveLayer } from "../../types/wave";
-
 import heightmapUrl from "../../assets/heightmap.jpg";
-import normalMapUrl from "../../assets/waterNormal.jpg?url";
-
-import { MAX_WAVES, TERRAIN_BOUNDS, DEFAULT_WIND_DIR, DEFAULT_SUN_DIR, EMPTY_WAVES } from "./oceanConsts"
 
 import { applyFragmentChunk, applyVertexChunk, handleDepthMaterial } from "./oceanUtils/shaders";
-import { fillWaveBuffers } from "./oceanUtils/waves";
-import { repeatTexture, singleTexture } from "./oceanUtils/textures";
 
 interface OceanTileProps {
-  carrierWaves?: WaveLayer[];
-  secondaryWaves?: WaveLayer[];
-  modulationStrength?: number;
-  secondaryNoiseScale?: number;
-  secondaryNoiseStrength?: number;
-  detailFBmScale?: number;
-  detailFBmStrength?: number;
-  detailFBmSpeed?: number;
-  detailWindDir?: [number, number];
-  terrainDamping?: number;
-  depthFade?: number;
-  depthScale?: number;
-  sunDirection?: [number, number, number];
-  normalStrength?: number;
-  normalScale?: number;
-  normalWarp?: number;
+  sharedDepthRT: THREE.WebGLRenderTarget;
+  disturbtion?: number;
+  windDirection?: [number, number];
+  windSpeed?: number;
+  currentDirection?: [number, number];
+  currentSpeed?: number;
+  tileOffset?: [number, number];
+  tileSize?: number;
+  resolution?: number;
+  lodLevel?: number;
+  innerHalfSize?: number;
+  renderOrder?: number;
 }
 
+const oceanUniformsStore = new Map<string, Record<string, THREE.IUniform>>();
+
 const OceanTile = ({
-  carrierWaves = EMPTY_WAVES,
-  secondaryWaves = EMPTY_WAVES,
-  modulationStrength = 0.7,
-  secondaryNoiseScale = 0.06,
-  secondaryNoiseStrength = 0.7,
-  detailFBmScale = 0.5,
-  detailFBmStrength = 0.015,
-  detailFBmSpeed = 0.04,
-  detailWindDir = DEFAULT_WIND_DIR,
-  terrainDamping = 0.9,
-  depthFade = 0.5,
-  depthScale = 5.0,
-  sunDirection = DEFAULT_SUN_DIR,
-  normalStrength = 0.4,
-  normalScale = 0.5,
-  normalWarp = 0.25,
-}: OceanTileProps) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const { gl, scene, size } = useThree();
+  id,
+  sharedDepthRT,
+  disturbtion = 0.3,
+  windDirection = [0, 1],
+  windSpeed = 1.0,
+  currentDirection = [0, 1],
+  currentSpeed = 0.5,
+  tileOffset = [0, 0],
+  tileSize = 60,
+  resolution = 256,
+  lodLevel = 0,
+  innerHalfSize = 0,
+  renderOrder = 0,
+}: OceanTileProps & { id: string }) => {
+  const { gl } = useThree();
 
-  const depthRT = useMemo(() => {
-    const dt = new THREE.DepthTexture(0, 0);
-    dt.type = THREE.UnsignedShortType;
-    return new THREE.WebGLRenderTarget(0, 0, {
-      depthTexture: dt,
-      depthBuffer: true,
-    });
-  }, []);
+  const heightmap = useTexture(heightmapUrl);
 
-  const normalMap = useTexture(normalMapUrl, repeatTexture);
-  const heightmap = useTexture(heightmapUrl, singleTexture);
+  const uniforms = useMemo(() => ({
+    uTime: { value: 0 },
+    uWindDir: { value: new THREE.Vector2(...windDirection) },
+    uWindSpeed: { value: windSpeed },
+    uCurrentDir: { value: new THREE.Vector2(...currentDirection) },
+    uCurrentSpeed: { value: currentSpeed },
+    uWaveAmplitude: { value: disturbtion },
+    uInnerHalfSize: { value: innerHalfSize },
+    uTileOffset: { value: new THREE.Vector2(...tileOffset) },
+    uLodLevel: { value: lodLevel },
+    uResolution: { value: new THREE.Vector2(gl.getSize(new THREE.Vector2()).x, gl.getSize(new THREE.Vector2()).y) },
+    uHeightmap: { value: heightmap },
+    uTerrainBounds: { value: new THREE.Vector4(-30, -30, 30, 30) },
+    uHeightScale: { value: 10 },
+    uTerrainDepth: { value: -4 },
+    uMaxDepth: { value: 5.0 },
+    uDepthTexture: { value: sharedDepthRT.depthTexture },
+    uDepthScale: { value: 5.1 },
+    uDepthFade: { value: 0.1 },
+    cameraNear: { value: 0.1 },
+    cameraFar: { value: 10000 },
+    uSceneColor: { value: sharedDepthRT.texture },
+    uReflectionStrength: { value: 0.05 },
+    uReflectionBlend: { value: 0.4 },
+    uSunDirection: { value: new THREE.Vector3(0.6, 0.3, 0.7).normalize() },
+    uFresnelPower: { value: 5.0 },
+    uSpecularPower: { value: 512.0 },
+    uSpecularIntensity: { value: 2.0 },
+  }), [
+    windDirection, windSpeed, currentDirection, currentSpeed, disturbtion, innerHalfSize, lodLevel,
+    gl, heightmap, sharedDepthRT
+    // tileOffset intentionally excluded — updated in-place below
+  ]);
 
+  useEffect((): any => {
+    oceanUniformsStore.set(id, uniforms);
+    return () => oceanUniformsStore.delete(id);
+  }, [id, uniforms]);
 
-
-  const dirs = useMemo(() => new Float32Array(MAX_WAVES * 2), []);
-  const amps = useMemo(() => new Float32Array(MAX_WAVES), []);
-  const steeps = useMemo(() => new Float32Array(MAX_WAVES), []);
-  const lens = useMemo(() => {
-    const a = new Float32Array(MAX_WAVES);
-    a.fill(1);
-    return a;
-  }, []);
-  const speeds = useMemo(() => new Float32Array(MAX_WAVES), []);
-  const warps = useMemo(() => new Float32Array(MAX_WAVES), []);
-
-  // Uniforms stables partagés entre meshStandardMaterial et depthMaterial
-  const customUniforms = useMemo(() => {
-    const allWaves = [...carrierWaves, ...secondaryWaves];
-    fillWaveBuffers(allWaves, dirs, amps, steeps, lens, speeds, warps);
-    return {
-      uTime: { value: 0 },
-      uWaveDirections: { value: dirs },
-      uWaveAmplitudes: { value: amps },
-      uWaveSteepnesses: { value: steeps },
-      uWaveWavelengths: { value: lens },
-      uWaveSpeeds: { value: speeds },
-      uWaveWarpStrengths: { value: warps },
-      uNumCarrierWaves: { value: carrierWaves.length },
-      uNumSecondaryWaves: { value: secondaryWaves.length },
-      uModulationStrength: { value: modulationStrength },
-      uSecondaryNoiseScale: { value: secondaryNoiseScale },
-      uSecondaryNoiseStrength: { value: secondaryNoiseStrength },
-      uDetailFBmScale: { value: detailFBmScale },
-      uDetailFBmStrength: { value: detailFBmStrength },
-      uDetailFBmSpeed: { value: detailFBmSpeed },
-      uDetailWindDir: {
-        value: new THREE.Vector2(detailWindDir[0], detailWindDir[1]),
-      },
-      uHeightmap: { value: heightmap },
-      uTerrainBounds: { value: TERRAIN_BOUNDS },
-      uTerrainDamping: { value: terrainDamping },
-      uSunDirection: {
-        value: new THREE.Vector3(
-          sunDirection[0],
-          sunDirection[1],
-          sunDirection[2],
-        ).normalize(),
-      },
-      uNormalMap: { value: normalMap },
-      uNormalStrength: { value: normalStrength },
-      uNormalScale: { value: normalScale },
-      uNormalWarp: { value: normalWarp },
-      uDepthTexture: { value: null as THREE.Texture | null },
-      uDepthFade: { value: 5.5 },
-      uDepthScale: { value: 0.1 },
-      uResolution: { value: new THREE.Vector2(1, 1) },
-      cameraNear: { value: 0.1 },
-      cameraFar: { value: 1000 },
-    };
-  }, []);
-
+  // In-place tileOffset update so shader references stay valid when grid scrolls
+  useEffect(() => {
+    uniforms.uTileOffset.value.set(tileOffset[0], tileOffset[1]);
+  }, [uniforms, tileOffset]);
 
   const injectShader = useCallback(
     (shader: THREE.WebGLProgramParametersWithUniforms) => {
-      // Object.assign(shader.uniforms, customUniforms);
-      applyVertexChunk(shader, customUniforms)
+      applyVertexChunk(shader, uniforms)
       applyFragmentChunk(shader)
     },
-    [customUniforms, applyVertexChunk],
+    [uniforms],
   );
 
-  const depthMaterial = useMemo(handleDepthMaterial, [applyVertexChunk]);
+  const depthMaterial = useMemo(
+    () => handleDepthMaterial(uniforms),
+    [uniforms]
+  );
 
-  // Sync waves
-  useEffect(() => {
-    const allWaves = [...carrierWaves, ...secondaryWaves];
-    fillWaveBuffers(allWaves, dirs, amps, steeps, lens, speeds, warps);
-    customUniforms.uNumCarrierWaves.value = carrierWaves.length;
-    customUniforms.uNumSecondaryWaves.value = secondaryWaves.length;
-  }, [
-    carrierWaves,
-    secondaryWaves,
-    dirs,
-    amps,
-    steeps,
-    lens,
-    speeds,
-    warps,
-    customUniforms,
-  ]);
-
-  useEffect(() => {
-    customUniforms.uModulationStrength.value = modulationStrength;
-    customUniforms.uSecondaryNoiseScale.value = secondaryNoiseScale;
-    customUniforms.uSecondaryNoiseStrength.value = secondaryNoiseStrength;
-  }, [
-    modulationStrength,
-    secondaryNoiseScale,
-    secondaryNoiseStrength,
-    customUniforms,
-  ]);
-
-  useEffect(() => {
-    customUniforms.uDetailFBmScale.value = detailFBmScale;
-    customUniforms.uDetailFBmStrength.value = detailFBmStrength;
-    customUniforms.uDetailFBmSpeed.value = detailFBmSpeed;
-    customUniforms.uDetailWindDir.value.set(detailWindDir[0], detailWindDir[1]);
-  }, [
-    detailFBmScale,
-    detailFBmStrength,
-    detailFBmSpeed,
-    detailWindDir,
-    customUniforms,
-  ]);
-
-  useEffect(() => {
-    customUniforms.uTerrainDamping.value = terrainDamping;
-  }, [terrainDamping, customUniforms]);
-
-  useEffect(() => {
-    customUniforms.uDepthFade.value = depthFade;
-    customUniforms.uDepthScale.value = depthScale;
-  }, [depthFade, depthScale, customUniforms]);
-
-  useEffect(() => {
-    customUniforms.uSunDirection.value
-      .set(sunDirection[0], sunDirection[1], sunDirection[2])
-      .normalize();
-  }, [sunDirection, customUniforms]);
-
-  useEffect(() => {
-    customUniforms.uNormalStrength.value = normalStrength;
-    customUniforms.uNormalScale.value = normalScale;
-    customUniforms.uNormalWarp.value = normalWarp;
-  }, [normalStrength, normalScale, normalWarp, customUniforms]);
-
-  useEffect(() => {
-    customUniforms.uDepthTexture.value = depthRT.depthTexture;
-    return () => depthRT.dispose();
-  }, [depthRT, customUniforms]);
-
-  useEffect(() => {
-    const w = Math.floor(size.width * gl.getPixelRatio());
-    const h = Math.floor(size.height * gl.getPixelRatio());
-    depthRT.setSize(w, h);
-    customUniforms.uResolution.value.set(w, h);
-  }, [size.width, size.height, gl, depthRT, customUniforms]);
-
-  useFrame(({ camera }) => {
-    if (!meshRef.current) return;
-    meshRef.current.visible = false;
-    gl.setRenderTarget(depthRT);
-    gl.clear();
-    gl.render(scene, camera);
-    gl.setRenderTarget(null);
-    meshRef.current.visible = true;
-  }, -1);
-
-  useFrame(({ clock, camera }) => {
-    customUniforms.uTime.value = clock.getElapsedTime();
-    if (camera instanceof THREE.PerspectiveCamera) {
-      customUniforms.cameraNear.value = camera.near;
-      customUniforms.cameraFar.value = camera.far;
-    }
-  });
+  useFrame((state) => {
+    const storedUniforms = oceanUniformsStore.get(id);
+    if (storedUniforms) {
+      storedUniforms.uTime.value = state.clock.elapsedTime;
+      const size = state.size;
+      storedUniforms.uResolution.value.set(size.width, size.height);
+      storedUniforms.cameraNear.value = state.camera.near;
+      storedUniforms.cameraFar.value = state.camera.far;
+    };
+  })
 
   return (
     <mesh
-      ref={meshRef}
+      position={[tileOffset[0], 0, tileOffset[1]]}
       rotation={[-Math.PI / 2, 0, 0]}
+      renderOrder={renderOrder}
+      frustumCulled={false}
       receiveShadow
       castShadow
       customDepthMaterial={depthMaterial}
     >
-      <planeGeometry args={[60, 60, 512, 512]} />
+      <planeGeometry args={[tileSize, tileSize, resolution, resolution]} />
       <meshStandardMaterial
         onBeforeCompile={injectShader}
-        customProgramCacheKey={() => `ocean-${MAX_WAVES}`}
+        customProgramCacheKey={() => `ocean`}
         transparent
         roughness={0}
         depthWrite={true}
@@ -249,6 +132,6 @@ const OceanTile = ({
       />
     </mesh>
   );
-};
+}
 
 export default OceanTile;

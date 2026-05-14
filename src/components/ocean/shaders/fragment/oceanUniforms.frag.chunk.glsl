@@ -1,15 +1,20 @@
-uniform float uTerrainDamping;
-uniform vec3 uSunDirection;
+uniform vec2  uTileOffset;
+
 uniform sampler2D uDepthTexture;
-uniform float uDepthFade;
-uniform float uDepthScale;
 uniform vec2 uResolution;
+uniform float uDepthScale;
+uniform float uDepthFade;
 uniform float cameraNear;
 uniform float cameraFar;
-uniform sampler2D uNormalMap;
-uniform float uNormalStrength;
-uniform float uNormalScale;
-uniform float uNormalWarp;
-uniform float uTime;
-varying vec3 vWorldPos;
-uniform float uTerrainDamping;
+
+uniform sampler2D uSceneColor;
+uniform float uReflectionStrength;
+uniform float uReflectionBlend;
+
+uniform vec3  uSunDirection;
+uniform float uFresnelPower;
+uniform float uSpecularPower;
+uniform float uSpecularIntensity;
+
+varying vec3 vOceanNormal;
+varying vec3 vOceanWorldPos;

@@ -1,33 +1,10 @@
 uniform float uTime;
+uniform vec2 uWindDir;
+uniform float uWindSpeed;
+uniform vec2 uTileOffset;
+uniform vec2  uCurrentDir;
+uniform float uCurrentSpeed;
+uniform float uWaveAmplitude;
 
-uniform vec2 uWaveDirections[MAX_WAVES];
-uniform float uWaveAmplitudes[MAX_WAVES];
-uniform float uWaveSteepnesses[MAX_WAVES];
-uniform float uWaveWavelengths[MAX_WAVES];
-uniform float uWaveSpeeds[MAX_WAVES];
-uniform float uWaveWarpStrengths[MAX_WAVES];
-
-uniform int uNumCarrierWaves;
-uniform int uNumSecondaryWaves;
-uniform float uModulationStrength;
-uniform float uSecondaryNoiseScale;
-uniform float uSecondaryNoiseStrength;
-
-uniform float uDetailFBmScale;
-uniform float uDetailFBmStrength;
-uniform float uDetailFBmSpeed;
-uniform vec2 uDetailWindDir;
-
-uniform sampler2D uHeightmap;
-uniform vec4 uTerrainBounds;
-uniform float uTerrainDamping;
-
-uniform vec3 uSunDirection;
-
-varying vec3 vWorldPos;
-varying float vTerrainH;
-
-uniform sampler2D uNormalMap;
-uniform float uNormalStrength;
-uniform float uNormalScale;
-uniform float uNormalWarp;
+varying vec3 vOceanWorldPos;
+varying vec3 vOceanNormal;

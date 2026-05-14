@@ -4,7 +4,7 @@ import { OrbitControls, Stats, Sky } from "@react-three/drei";
 import Boat from "./components/Boat";
 import type { WaveLayer } from "./types/wave";
 import Terrain from "./components/Terrain";
-import OceanTile from "./components/ocean/OceanTile";
+import OceanGrid from "./components/ocean/OceanGrid";
 
 // Vagues porteuses — longue période, direction du courant
 const CARRIER_WAVES: WaveLayer[] = [
@@ -72,7 +72,7 @@ export default function App() {
           mieDirectionalG={0.85}
         />
 
-        <ambientLight intensity={3} color="#1a2a4a" />
+        <ambientLight intensity={3.3} color="#1a2a4a" />
         <directionalLight
           position={SUN_POSITION}
           intensity={2.0}
@@ -90,7 +90,7 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
-          <Terrain heightScale={4} terrainDepth={-3} />
+          <Terrain heightScale={4} terrainDepth={-2} />
           {/*<Ocean
             carrierWaves={CARRIER_WAVES}
             secondaryWaves={SECONDARY_WAVES}
@@ -107,17 +107,7 @@ export default function App() {
             detailFBmStrength={0.2}
             detailFBmSpeed={1}
           />*/}
-          <OceanTile
-            // carrierWaves={CARRIER_WAVES}
-            secondaryWaves={SECONDARY_WAVES}
-            modulationStrength={0.7}
-            secondaryNoiseScale={0.1}
-            secondaryNoiseStrength={1}
-            detailFBmStrength={0.1}
-            detailFBmSpeed={1}
-            terrainDamping={3.9}
-            sunDirection={SUN_POSITION}
-          />
+          <OceanGrid disturbtion={0} />
         </Suspense>
 
         <OrbitControls

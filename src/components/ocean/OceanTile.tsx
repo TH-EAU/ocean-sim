@@ -1,50 +1,18 @@
+import * as THREE from "three";
 import { useRef, useMemo, useEffect, useCallback } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
-import * as THREE from "three";
 
-import type { WaveLayer } from "../types/wave";
-import waterUniformsChunk from "./shaders/chunks/oceanUniforms.vert.chunk.glsl?raw";
-import waterHelpersChunk from "./shaders/chunks/oceanHelpers.vert.chunk.glsl?raw";
-import waterVertexChunk from "./shaders/chunks/ocean.vert.chunk.glsl?raw";
-import waterColorChunk from "./shaders/chunks/oceanColor.frag.chunk.glsl?raw";
-import colorHelpersChunk from "./shaders/chunks/oceanColorHelpers.frag.chunk.glsl?raw";
-import heightmapUrl from "../assets/heightmap.jpg?url";
+import type { WaveLayer } from "../../types/wave";
 
-import normalMapUrl from "../assets/waterNormal.jpg?url";
+import heightmapUrl from "../../assets/heightmap.jpg";
+import normalMapUrl from "../../assets/waterNormal.jpg?url";
 
-const MAX_WAVES = 8;
-const TERRAIN_BOUNDS = new THREE.Vector4(-30, -30, 30, 30);
-const DEFAULT_WIND_DIR: [number, number] = [-0.8, -0.8];
-const DEFAULT_SUN_DIR: [number, number, number] = [100, 10, 100];
-const EMPTY_WAVES: WaveLayer[] = [];
+import { MAX_WAVES, TERRAIN_BOUNDS, DEFAULT_WIND_DIR, DEFAULT_SUN_DIR, EMPTY_WAVES } from "./oceanConsts"
 
-function fillWaveBuffers(
-  waves: WaveLayer[],
-  dirs: Float32Array,
-  amps: Float32Array,
-  steeps: Float32Array,
-  lens: Float32Array,
-  speeds: Float32Array,
-  warps: Float32Array,
-) {
-  dirs.fill(0);
-  amps.fill(0);
-  steeps.fill(0);
-  lens.fill(1);
-  speeds.fill(0);
-  warps.fill(0);
-  waves.forEach((w, i) => {
-    if (i >= MAX_WAVES) return;
-    dirs[i * 2] = w.direction[0];
-    dirs[i * 2 + 1] = w.direction[1];
-    amps[i] = w.amplitude;
-    steeps[i] = w.steepness;
-    lens[i] = w.wavelength;
-    speeds[i] = w.speed;
-    warps[i] = w.warpStrength ?? 0;
-  });
-}
+import { applyFragmentChunk, applyVertexChunk, handleDepthMaterial } from "./oceanUtils/shaders";
+import { fillWaveBuffers } from "./oceanUtils/waves";
+import { repeatTexture, singleTexture } from "./oceanUtils/textures";
 
 interface OceanTileProps {
   carrierWaves?: WaveLayer[];
@@ -95,18 +63,10 @@ const OceanTile = ({
     });
   }, []);
 
-  const normalMap = useTexture(normalMapUrl, (tex) => {
-    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-    tex.minFilter = THREE.LinearMipmapLinearFilter;
-    tex.needsUpdate = true;
-  });
+  const normalMap = useTexture(normalMapUrl, repeatTexture);
+  const heightmap = useTexture(heightmapUrl, singleTexture);
 
-  const heightmap = useTexture(heightmapUrl, (tex) => {
-    tex.minFilter = THREE.LinearFilter;
-    tex.generateMipmaps = false;
-    tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-    tex.needsUpdate = true;
-  });
+
 
   const dirs = useMemo(() => new Float32Array(MAX_WAVES * 2), []);
   const amps = useMemo(() => new Float32Array(MAX_WAVES), []);
@@ -165,46 +125,17 @@ const OceanTile = ({
     };
   }, []);
 
-  const applyVertexChunk = useCallback(
-    (shader: THREE.WebGLProgramParametersWithUniforms) => {
-      Object.assign(shader.uniforms, customUniforms);
-      shader.vertexShader = (
-        `#define MAX_WAVES ${MAX_WAVES}\n` + shader.vertexShader
-      )
-        .replace(
-          `#include <common>`,
-          `#include <common>\n${waterUniformsChunk}\n${waterHelpersChunk}`,
-        )
-        .replace(`#include <begin_vertex>`, waterVertexChunk);
-    },
-    [customUniforms],
-  );
 
   const injectShader = useCallback(
     (shader: THREE.WebGLProgramParametersWithUniforms) => {
-      applyVertexChunk(shader);
-      shader.vertexShader = `#define OCEAN_USE_NORMALS\n` + shader.vertexShader;
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          `#include <common>`,
-          `#include <common>\nuniform float uTerrainDamping;\nuniform vec3 uSunDirection;\nuniform sampler2D uDepthTexture;\nuniform float uDepthFade;\nuniform float uDepthScale;\nuniform vec2 uResolution;\nuniform float cameraNear;\nuniform float cameraFar;\nuniform sampler2D uNormalMap;\nuniform float uNormalStrength;\nuniform float uNormalScale;\nuniform float uNormalWarp;\nuniform float uTime;\nvarying vec3 vWorldPos;\n${colorHelpersChunk}`,
-        )
-        .replace(
-          `#include <map_fragment>`,
-          `#include <map_fragment>\n${waterColorChunk}`,
-        );
+      // Object.assign(shader.uniforms, customUniforms);
+      applyVertexChunk(shader, customUniforms)
+      applyFragmentChunk(shader)
     },
     [customUniforms, applyVertexChunk],
   );
 
-  const depthMaterial = useMemo(() => {
-    const mat = new THREE.MeshDepthMaterial({
-      depthPacking: THREE.RGBADepthPacking,
-    });
-    mat.onBeforeCompile = applyVertexChunk;
-    mat.customProgramCacheKey = () => `ocean-depth-${MAX_WAVES}`;
-    return mat;
-  }, [applyVertexChunk]);
+  const depthMaterial = useMemo(handleDepthMaterial, [applyVertexChunk]);
 
   // Sync waves
   useEffect(() => {

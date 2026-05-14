@@ -4,7 +4,7 @@ import { OrbitControls, Stats, Sky } from "@react-three/drei";
 import Boat from "./components/Boat";
 import type { WaveLayer } from "./types/wave";
 import Terrain from "./components/Terrain";
-import OceanTile from "./components/OceanTile";
+import OceanTile from "./components/ocean/OceanTile";
 
 // Vagues porteuses — longue période, direction du courant
 const CARRIER_WAVES: WaveLayer[] = [
@@ -72,7 +72,7 @@ export default function App() {
           mieDirectionalG={0.85}
         />
 
-        <ambientLight intensity={0.3} color="#1a2a4a" />
+        <ambientLight intensity={3} color="#1a2a4a" />
         <directionalLight
           position={SUN_POSITION}
           intensity={2.0}
@@ -124,7 +124,7 @@ export default function App() {
           enableDamping
           dampingFactor={0.08}
           minDistance={3}
-          maxDistance={45}
+          maxDistance={145}
           maxPolarAngle={Math.PI / 2.1}
         />
         <Stats />

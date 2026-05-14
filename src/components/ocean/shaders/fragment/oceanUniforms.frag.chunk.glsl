@@ -1,0 +1,15 @@
+uniform float uTerrainDamping;
+uniform vec3 uSunDirection;
+uniform sampler2D uDepthTexture;
+uniform float uDepthFade;
+uniform float uDepthScale;
+uniform vec2 uResolution;
+uniform float cameraNear;
+uniform float cameraFar;
+uniform sampler2D uNormalMap;
+uniform float uNormalStrength;
+uniform float uNormalScale;
+uniform float uNormalWarp;
+uniform float uTime;
+varying vec3 vWorldPos;
+uniform float uTerrainDamping;

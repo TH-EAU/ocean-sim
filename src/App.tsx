@@ -91,7 +91,7 @@ export default function App() {
 
         <Suspense fallback={null}>
           <Boat position={[0, -0.8, 10]} scale={1} />
-          <Terrain heightScale={14} terrainDepth={-8} />
+          <Terrain heightScale={34} terrainDepth={-22} />
           {/* <AbsorbTest /> */}
           {/*<Ocean
             carrierWaves={CARRIER_WAVES}

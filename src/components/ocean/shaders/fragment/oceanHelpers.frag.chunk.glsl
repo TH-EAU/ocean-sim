@@ -6,8 +6,8 @@ float linearizeDepth(float raw) {
 vec3 skyColor(vec3 dir) {
     float up = max(dir.y, 0.0);
     vec3 zenith = vec3(0.08, 0.28, 0.75);
-    vec3 horiz  = vec3(0.58, 0.75, 0.92);
-    vec3 sky    = mix(horiz, zenith, smoothstep(0.0, 0.40, up));
+    vec3 horiz = vec3(0.58, 0.75, 0.92);
+    vec3 sky = mix(horiz, zenith, smoothstep(0.0, 0.40, up));
     float sunAz = max(0.0, dot(normalize(dir), uSunDirection));
     float hGlow = (1.0 - smoothstep(0.0, 0.15, up)) * pow(sunAz, 3.0);
     sky = mix(sky, vec3(1.0, 0.65, 0.25), hGlow * 0.55);

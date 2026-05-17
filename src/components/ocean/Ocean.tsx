@@ -4,12 +4,16 @@
  *
  * @param currentDirection
  * C'est la direction du courant, elle détermine aussi la direction des vagues porteuses. Je le donne en degrés
+ *
+ * @param windSpeed
+ * Vitesse de base du vent en m/s. Varie dynamiquement dans useFrame (±20%).
  */
 
 import * as THREE from "three";
-import { useMemo, useRef } from "react";
+import React, { useMemo, useRef } from "react";
 import OceanChunk from "./OceanChunk";
 import { useFrame, useThree } from "@react-three/fiber";
+import { OceanContext } from "./OceanContext";
 
 interface OceanLOD {
     baseTileSize: number
@@ -18,9 +22,13 @@ interface OceanLOD {
 }
 
 interface OceanProps {
-    disturbtion?: number
+    disturbtion?:     number
     currentDirection?: number
-    lod?: OceanLOD
+    windSpeed?:        number
+    windAngleRef?:     React.RefObject<number>
+    windSpeedRef?:     React.RefObject<number>
+    lod?:              OceanLOD
+    children?:         React.ReactNode
 }
 
 // Tile size for a given axis slot index (0 = center): doubles each step
@@ -32,8 +40,6 @@ const computeTileSize = (base: number, ring: number): number =>
     base * Math.pow(2, ring);
 
 // World-space center offset for chunk (row, col), accumulating axis sizes independently.
-// Along X: sizes of axis-slots 0...|col|-1. Along Z: sizes of axis-slots 0...|row|-1.
-// Tiles at corner positions may overlap slightly — acceptable for an ocean surface.
 const computeGridOffset = (row: number, col: number, base: number): [number, number] => {
     let ox = 0;
     for (let c = 0; c < Math.abs(col); c++) {
@@ -49,7 +55,11 @@ const computeGridOffset = (row: number, col: number, base: number): [number, num
 const Ocean = ({
     disturbtion = 0.3,
     currentDirection: currentDirectionDeg = 0,
+    windSpeed = 5,
+    windAngleRef,
+    windSpeedRef,
     lod = { baseTileSize: 100, gridRadius: 5, levels: [128, 128, 64, 8, 1] },
+    children,
 }: OceanProps) => {
     const { gl, scene } = useThree();
     const groupRef = useRef<THREE.Group>(null);
@@ -58,7 +68,9 @@ const Ocean = ({
         const rad = currentDirectionDeg * (Math.PI / 180);
         return [Math.cos(rad), Math.sin(rad)];
     }, [currentDirectionDeg]);
-    // Camera position shared with all chunks via ref — no React re-renders on move
+
+    const baseAngle = currentDirectionDeg * (Math.PI / 180);
+
     const cameraOffsetRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
 
     const sharedDepthRT = useMemo(() => {
@@ -91,6 +103,7 @@ const Ocean = ({
         return list;
     }, []);
 
+    // Depth pre-pass (priority -1 = before main render)
     useFrame(({ camera, size }) => {
         if (!groupRef.current) return;
         if (sharedDepthRT.width !== size.width || sharedDepthRT.height !== size.height) {
@@ -102,27 +115,36 @@ const Ocean = ({
         gl.render(scene, camera);
         gl.setRenderTarget(null);
         groupRef.current.visible = true;
-        // Update shared camera ref — chunks read this in their own useFrame
         cameraOffsetRef.current.set(camera.position.x, camera.position.z);
     }, -1);
 
+    // Dynamic wind variation — slow drift around base direction, ±20% speed
+    useFrame(({ clock }) => {
+        const t = clock.elapsedTime;
+        if (windAngleRef) windAngleRef.current = baseAngle + 0.3 * Math.sin(t * 0.07);
+        if (windSpeedRef) windSpeedRef.current = windSpeed * (0.8 + 0.2 * Math.sin(t * 0.05));
+    });
+
     return (
-        <group ref={groupRef}>
-            {chunks.map(({ row, col, ring, resolution, tileSize, gridOffset }) => (
-                <OceanChunk
-                    key={`chunk_${row}_${col}`}
-                    id={`chunk_${row}_${col}`}
-                    tileSize={tileSize}
-                    gridOffset={gridOffset}
-                    cameraOffsetRef={cameraOffsetRef}
-                    resolution={resolution}
-                    depthRT={sharedDepthRT}
-                    downgradeQuality={ring >= 2}
-                    disturbtion={disturbtion}
-                    currentDirection={currentDirection}
-                />
-            ))}
-        </group>
+        <OceanContext.Provider value={{ disturbtion, currentDirection, currentSpeed: 0, windSpeed }}>
+            <group ref={groupRef}>
+                {chunks.map(({ row, col, ring, resolution, tileSize, gridOffset }) => (
+                    <OceanChunk
+                        key={`chunk_${row}_${col}`}
+                        id={`chunk_${row}_${col}`}
+                        tileSize={tileSize}
+                        gridOffset={gridOffset}
+                        cameraOffsetRef={cameraOffsetRef}
+                        resolution={resolution}
+                        depthRT={sharedDepthRT}
+                        downgradeQuality={ring >= 4}
+                        disturbtion={disturbtion}
+                        currentDirection={currentDirection}
+                    />
+                ))}
+            </group>
+            {children}
+        </OceanContext.Provider>
     );
 };
 

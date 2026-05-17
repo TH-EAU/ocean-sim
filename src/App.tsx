@@ -4,6 +4,7 @@ import { OrbitControls, Stats, Sky } from "@react-three/drei";
 import Boat from "./components/Boat";
 import Terrain from "./components/Terrain";
 import OceanGrid from "./components/ocean/OceanGrid";
+import Ocean from "./components/ocean/Ocean";
 
 const SUN_POSITION: [number, number, number] = [100, 30, 100];
 
@@ -59,14 +60,15 @@ export default function App() {
             detailFBmStrength={0.2}
             detailFBmSpeed={1}
           />*/}
-          <OceanGrid disturbtion={0.5} />
+          {/* <OceanGrid disturbtion={2.5} /> */}
+          <Ocean />
         </Suspense>
 
         <OrbitControls
           enableDamping
           dampingFactor={0.08}
           minDistance={3}
-          maxDistance={145}
+          maxDistance={1145}
           maxPolarAngle={Math.PI / 2.1}
         />
         <Stats />

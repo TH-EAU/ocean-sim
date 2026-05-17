@@ -19,8 +19,8 @@ import {
   VAR_PERTURB,
 } from "./oceanConsts";
 
-const CHUNK_SIZE = 200;
-const GRID_RADIUS = 2; // 5×5 = 25 chunks
+const CHUNK_SIZE = 100;
+const GRID_RADIUS = 10; // 5×5 = 25 chunks
 
 const LOD_LEVELS = [
   { resolution: 128 }, // ring 0 — centre

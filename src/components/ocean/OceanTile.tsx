@@ -53,23 +53,13 @@ const OceanTile = ({
           gl.getSize(new THREE.Vector2()).y,
         ),
       },
-      uHeightmap: { value: heightmap },
-      uTerrainHeight: { value: heightmap },
-      uTerrainBounds: { value: new THREE.Vector4(-30, -30, 30, 30) },
-      uHeightScale: { value: 10 },
-      uTerrainDepth: { value: -4 },
       uDepthTexture: { value: sharedDepthRT.depthTexture },
       uDepthScale: { value: 21.1 },
-      uDepthFade: { value: 4.1 },
       cameraNear: { value: 0.1 },
       cameraFar: { value: 10000 },
-      uSceneColor: { value: sharedDepthRT.texture },
-      uReflectionStrength: { value: 0.05 },
-      uReflectionBlend: { value: 0.4 },
       uSunDirection: { value: new THREE.Vector3(0.6, 0.3, 0.7).normalize() },
       uFresnelPower: { value: 0.5 },
-      uSpecularPower: { value: 512.0 },
-      uSpecularIntensity: { value: 2.0 },
+
     }),
     // waveDirAmp and waveParams are stable arrays mutated in-place by OceanGrid
     // tileOffset is also updated in-place below
@@ -96,7 +86,7 @@ const OceanTile = ({
   );
 
   const depthMaterial = useMemo(
-    () => handleDepthMaterial(uniforms),
+    () => handleDepthMaterial(uniforms, id), // ici voir si avoir séparé l'id de mémoire a une incidence
     [uniforms],
   );
 
@@ -117,7 +107,7 @@ const OceanTile = ({
       renderOrder={renderOrder}
       frustumCulled={false}
       receiveShadow
-      castShadow
+      // castShadow
       customDepthMaterial={depthMaterial}
     >
       <planeGeometry args={[tileSize, tileSize, resolution, resolution]} />
@@ -128,6 +118,7 @@ const OceanTile = ({
         roughness={0}
         depthWrite={true}
         side={THREE.FrontSide}
+
       />
     </mesh>
   );

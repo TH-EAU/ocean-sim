@@ -5,8 +5,5 @@ uniform int uWaveCount;
 uniform vec4 uWaveDirAmp[MAX_WAVES];  // .xy = direction, .z = amplitude, .w = wavelength
 uniform vec4 uWaveParams[MAX_WAVES];  // .x = steepness (Q), .y = speed (ω), .z = warpStrength, .w = unused
 
-uniform sampler2D uTerrainHeight;
-uniform vec4 uTerrainBounds;
-
 varying vec3 vOceanWorldPos;
 varying vec3 vOceanNormal;

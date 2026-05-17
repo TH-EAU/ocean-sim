@@ -170,6 +170,8 @@ const OceanGrid = ({
               tileOffset={[cx, cz]}
               tileSize={CHUNK_SIZE}
               resolution={resolution}
+              disturbtion={disturbtion}
+              currentDirection={currentDirection}
             />
           );
         })}

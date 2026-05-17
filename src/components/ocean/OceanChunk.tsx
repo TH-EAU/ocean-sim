@@ -14,6 +14,8 @@ interface OceanChunk {
     resolution?: number;
     renderOrder?: number;
     downgradeQuality?: boolean;
+    disturbtion?: number;
+    currentDirection?: [number, number];
 }
 
 const chunkUniformsStore = new Map<string, Record<string, THREE.IUniform>>();
@@ -27,6 +29,8 @@ const OceanChunk = ({
     resolution = 256,
     renderOrder = 0,
     downgradeQuality = false,
+    disturbtion = 0.3,
+    currentDirection = [0, 1],
 }: OceanChunk) => {
     const { gl } = useThree();
     const meshRef = useRef<THREE.Mesh>(null);
@@ -47,6 +51,8 @@ const OceanChunk = ({
             cameraFar: { value: 10000 },
             uSunDirection: { value: new THREE.Vector3(0.6, 0.3, 0.7).normalize() },
             uFresnelPower: { value: 0.5 },
+            uCurrentDirection: { value: new THREE.Vector2(currentDirection[0], currentDirection[1]) },
+            uDisturbtion: { value: disturbtion },
         }),
         [gl, depthRT],
     );
@@ -68,6 +74,14 @@ const OceanChunk = ({
         chunkUniformsStore.set(id, uniforms);
         return () => { chunkUniformsStore.delete(id); };
     }, [id, uniforms]);
+
+    useEffect(() => {
+        uniforms.uCurrentDirection.value.set(currentDirection[0], currentDirection[1]);
+    }, [uniforms, currentDirection]);
+
+    useEffect(() => {
+        uniforms.uDisturbtion.value = disturbtion;
+    }, [uniforms, disturbtion]);
 
     useFrame((state) => {
         const u = chunkUniformsStore.get(id);

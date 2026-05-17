@@ -7,3 +7,6 @@ uniform vec4 uWaveParams[MAX_WAVES];  // .x = steepness (Q), .y = speed (ω), .z
 
 varying vec3 vOceanWorldPos;
 varying vec3 vOceanNormal;
+
+uniform vec2  uCurrentDirection;
+uniform float uDisturbtion;

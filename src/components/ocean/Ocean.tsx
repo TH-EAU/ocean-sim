@@ -47,12 +47,17 @@ const computeGridOffset = (row: number, col: number, base: number): [number, num
 };
 
 const Ocean = ({
-    disturbtion: _disturbtion = 0.3,
-    currentDirection: _currentDirection = 0,
+    disturbtion = 0.3,
+    currentDirection: currentDirectionDeg = 0,
     lod = { baseTileSize: 100, gridRadius: 5, levels: [128, 128, 64, 8, 1] },
 }: OceanProps) => {
     const { gl, scene } = useThree();
     const groupRef = useRef<THREE.Group>(null);
+
+    const currentDirection = useMemo<[number, number]>(() => {
+        const rad = currentDirectionDeg * (Math.PI / 180);
+        return [Math.cos(rad), Math.sin(rad)];
+    }, [currentDirectionDeg]);
     // Camera position shared with all chunks via ref — no React re-renders on move
     const cameraOffsetRef = useRef<THREE.Vector2>(new THREE.Vector2(0, 0));
 
@@ -113,6 +118,8 @@ const Ocean = ({
                     resolution={resolution}
                     depthRT={sharedDepthRT}
                     downgradeQuality={ring >= 2}
+                    disturbtion={disturbtion}
+                    currentDirection={currentDirection}
                 />
             ))}
         </group>

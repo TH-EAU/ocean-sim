@@ -23,6 +23,8 @@ interface OceanTileProps {
   tileSize?: number;
   resolution?: number;
   renderOrder?: number;
+  disturbtion?: number;
+  currentDirection?: [number, number];
 }
 
 const oceanUniformsStore = new Map<string, Record<string, THREE.IUniform>>();
@@ -36,6 +38,8 @@ const OceanTile = ({
   tileSize = 60,
   resolution = 256,
   renderOrder = 0,
+  disturbtion = 0.3,
+  currentDirection = [0, 1],
 }: OceanTileProps) => {
   const { gl } = useThree();
   const heightmap = useTexture(heightmapUrl);
@@ -47,6 +51,8 @@ const OceanTile = ({
       uWaveCount: { value: WAVE_COUNT },
       uWaveDirAmp: { value: waveDirAmp },
       uWaveParams: { value: waveParams },
+      uCurrentDirection: { value: new THREE.Vector2(currentDirection[0], currentDirection[1]) },
+      uDisturbtion: { value: disturbtion },
       uResolution: {
         value: new THREE.Vector2(
           gl.getSize(new THREE.Vector2()).x,
@@ -76,6 +82,14 @@ const OceanTile = ({
   useEffect(() => {
     uniforms.uTileOffset.value.set(tileOffset[0], tileOffset[1]);
   }, [uniforms, tileOffset]);
+
+  useEffect(() => {
+    uniforms.uCurrentDirection.value.set(currentDirection[0], currentDirection[1]);
+  }, [uniforms, currentDirection]);
+
+  useEffect(() => {
+    uniforms.uDisturbtion.value = disturbtion;
+  }, [uniforms, disturbtion]);
 
   const injectShader = useCallback(
     (shader: THREE.WebGLProgramParametersWithUniforms) => {

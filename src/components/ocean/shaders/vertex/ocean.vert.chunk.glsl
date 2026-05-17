@@ -1,37 +1,24 @@
-// World XZ position before any displacement (modelMatrix includes tile offset + rotation)
 vec2 worldXZ = (modelMatrix * vec4(position, 1.0)).xz;
 
-vec3 totalDisp   = vec3(0.0);
-vec3 normalDelta = vec3(0.0);
-vec2 warpedXZ    = worldXZ;
+const float WAVE_STEEPNESS = 0.5;
+const float WAVE_SPEED = 1.2;
 
-for (int i = 0; i < MAX_WAVES; i++) {
-    if (i >= uWaveCount) break;
+float amplitude = uDisturbtion * 1.5;
+float wavelength = max(uDisturbtion * 50.0, 0.5);
+float k = 2.0 * PI / wavelength;
+float omega = WAVE_SPEED * sqrt(9.81 * k);
 
-    vec4 da = uWaveDirAmp[i];   // .xy = dir, .z = amplitude, .w = wavelength
-    vec4 pm = uWaveParams[i];   // .x = Q (steepness), .y = omega, .z = warpStrength
+GerstnerOut g = gerstnerWave(worldXZ, uCurrentDirection, amplitude, k, WAVE_STEEPNESS, omega, uTime);
 
-    float k = 2.0 * PI / da.w;
-    GerstnerOut g = gerstnerWave(warpedXZ, da.xy, da.z, k, pm.x, pm.y, uTime);
-
-    totalDisp   += g.disp;
-    normalDelta += g.normalDelta;
-
-    // Domain warp: offset next wave's sample position by accumulated horizontal displacement
-    warpedXZ += totalDisp.xz * pm.z;
-}
-
-// Apply displacement: world (dx, dy_up, dz) → local (dx, -dz, dy_up)
-// Mesh is rotated -PI/2 around X: local.y → world.-z, local.z → world.y
+// world (dx, dy_up, dz) → local (dx, -dz, dy_up) — mesh tourné -PI/2 autour de X
 vec3 pos = position;
-pos.x += totalDisp.x;
-pos.y -= totalDisp.z;
-pos.z += totalDisp.y;
+pos.x += g.disp.x;
+pos.y -= g.disp.z;
+pos.z += g.disp.y;
 
 #ifdef OCEAN_USE_NORMALS
-// world normal → local: (nx, ny, nz) → (nx, -nz, ny)
-vec3 worldN = normalize(vec3(normalDelta.x, 1.0 + normalDelta.y, normalDelta.z));
-objectNormal = normalize(vec3(worldN.x, -worldN.z, worldN.y));
+vec3 worldN = normalize(vec3(g.normalDelta.x, 1.0 + g.normalDelta.y, g.normalDelta.z));
+objectNormal = normalize(vec3(worldN.x, - worldN.z, worldN.y));
 vOceanNormal = objectNormal;
 #endif
 

@@ -2,58 +2,8 @@ import { Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stats, Sky } from "@react-three/drei";
 import Boat from "./components/Boat";
-import type { WaveLayer } from "./types/wave";
 import Terrain from "./components/Terrain";
 import OceanGrid from "./components/ocean/OceanGrid";
-import AbsorbTest from "./components/AbsorbTest";
-
-// Vagues porteuses — longue période, direction du courant
-const CARRIER_WAVES: WaveLayer[] = [
-  {
-    direction: [1.0, 0.3],
-    amplitude: 0.3,
-    steepness: 0.9,
-    wavelength: 20.0,
-    speed: 0.2,
-    warpStrength: 1,
-  },
-  {
-    direction: [1.5, 0.8],
-    amplitude: 0.9,
-    steepness: 0.6,
-    wavelength: 15.0,
-    speed: 0.2,
-    warpStrength: 1,
-  },
-  {
-    direction: [0.5, 1.2],
-    amplitude: 0.2,
-    steepness: 0.6,
-    wavelength: 15.0,
-    speed: 0.2,
-    warpStrength: 1,
-  },
-];
-
-// Vaguelettes — direction du vent, amplitude modulée par les portantes
-const SECONDARY_WAVES: WaveLayer[] = [
-  {
-    direction: [-1.0, -0.3],
-    amplitude: 0.1,
-    steepness: 2.9,
-    wavelength: 5.0,
-    speed: 0.5,
-    warpStrength: 1,
-  },
-  {
-    direction: [-1.5, -0.3],
-    amplitude: 0.05,
-    steepness: 0.9,
-    wavelength: 5.0,
-    speed: 0.2,
-    warpStrength: 1,
-  },
-];
 
 const SUN_POSITION: [number, number, number] = [100, 30, 100];
 
@@ -109,7 +59,7 @@ export default function App() {
             detailFBmStrength={0.2}
             detailFBmSpeed={1}
           />*/}
-          <OceanGrid disturbtion={0} />
+          <OceanGrid disturbtion={0.5} />
         </Suspense>
 
         <OrbitControls

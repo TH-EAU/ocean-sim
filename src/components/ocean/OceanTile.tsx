@@ -10,19 +10,18 @@ import {
   applyVertexChunk,
   handleDepthMaterial,
 } from "./oceanUtils/shaders";
+import { WAVE_COUNT } from "./OceanGrid";
 
 interface OceanTileProps {
+  id: string;
   sharedDepthRT: THREE.WebGLRenderTarget;
-  disturbtion?: number;
-  windDirection?: [number, number];
-  windSpeed?: number;
-  currentDirection?: [number, number];
-  currentSpeed?: number;
+  /** Per-wave data computed by OceanGrid: [dir.x, dir.y, amplitude, wavelength] */
+  waveDirAmp: THREE.Vector4[];
+  /** Per-wave params computed by OceanGrid: [steepness Q, omega, warpStrength, 0] */
+  waveParams: THREE.Vector4[];
   tileOffset?: [number, number];
   tileSize?: number;
   resolution?: number;
-  lodLevel?: number;
-  innerHalfSize?: number;
   renderOrder?: number;
 }
 
@@ -31,33 +30,23 @@ const oceanUniformsStore = new Map<string, Record<string, THREE.IUniform>>();
 const OceanTile = ({
   id,
   sharedDepthRT,
-  disturbtion = 0.3,
-  windDirection = [0, 1],
-  windSpeed = 1.0,
-  currentDirection = [0, 1],
-  currentSpeed = 0.5,
+  waveDirAmp,
+  waveParams,
   tileOffset = [0, 0],
   tileSize = 60,
   resolution = 256,
-  lodLevel = 0,
-  innerHalfSize = 0,
   renderOrder = 0,
-}: OceanTileProps & { id: string }) => {
+}: OceanTileProps) => {
   const { gl } = useThree();
-
   const heightmap = useTexture(heightmapUrl);
 
   const uniforms = useMemo(
     () => ({
       uTime: { value: 0 },
-      uWindDir: { value: new THREE.Vector2(...windDirection) },
-      uWindSpeed: { value: windSpeed },
-      uCurrentDir: { value: new THREE.Vector2(...currentDirection) },
-      uCurrentSpeed: { value: currentSpeed },
-      uWaveAmplitude: { value: disturbtion },
-      uInnerHalfSize: { value: innerHalfSize },
       uTileOffset: { value: new THREE.Vector2(...tileOffset) },
-      uLodLevel: { value: lodLevel },
+      uWaveCount: { value: WAVE_COUNT },
+      uWaveDirAmp: { value: waveDirAmp },
+      uWaveParams: { value: waveParams },
       uResolution: {
         value: new THREE.Vector2(
           gl.getSize(new THREE.Vector2()).x,
@@ -69,7 +58,6 @@ const OceanTile = ({
       uTerrainBounds: { value: new THREE.Vector4(-30, -30, 30, 30) },
       uHeightScale: { value: 10 },
       uTerrainDepth: { value: -4 },
-      uMaxDepth: { value: 5.0 },
       uDepthTexture: { value: sharedDepthRT.depthTexture },
       uDepthScale: { value: 21.1 },
       uDepthFade: { value: 4.1 },
@@ -83,24 +71,15 @@ const OceanTile = ({
       uSpecularPower: { value: 512.0 },
       uSpecularIntensity: { value: 2.0 },
     }),
-    [
-      windDirection,
-      windSpeed,
-      currentDirection,
-      currentSpeed,
-      disturbtion,
-      innerHalfSize,
-      lodLevel,
-      gl,
-      heightmap,
-      sharedDepthRT,
-      // tileOffset intentionally excluded — updated in-place below
-    ],
+    // waveDirAmp and waveParams are stable arrays mutated in-place by OceanGrid
+    // tileOffset is also updated in-place below
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [gl, heightmap, sharedDepthRT],
   );
 
-  useEffect((): any => {
+  useEffect(() => {
     oceanUniformsStore.set(id, uniforms);
-    return () => oceanUniformsStore.delete(id);
+    return () => { oceanUniformsStore.delete(id); };
   }, [id, uniforms]);
 
   // In-place tileOffset update so shader references stay valid when grid scrolls
@@ -122,13 +101,12 @@ const OceanTile = ({
   );
 
   useFrame((state) => {
-    const storedUniforms = oceanUniformsStore.get(id);
-    if (storedUniforms) {
-      storedUniforms.uTime.value = state.clock.elapsedTime;
-      const size = state.size;
-      storedUniforms.uResolution.value.set(size.width, size.height);
-      storedUniforms.cameraNear.value = state.camera.near;
-      storedUniforms.cameraFar.value = state.camera.far;
+    const u = oceanUniformsStore.get(id);
+    if (u) {
+      u.uTime.value = state.clock.elapsedTime;
+      u.uResolution.value.set(state.size.width, state.size.height);
+      u.cameraNear.value = state.camera.near;
+      u.cameraFar.value = state.camera.far;
     }
   });
 

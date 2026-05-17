@@ -6,11 +6,12 @@ import { useOcean } from "./ocean/OceanContext";
 import { sampleOceanY } from "./ocean/oceanUtils/gerstner";
 import { sampleTerrainY } from "./ocean/oceanUtils/terrainSampler";
 
-const DRIFT_FORCE = 0.015;
-const SPEED_DRAG = 0.97;
-const GYRO = 0.4;
-const RUDDER_STRENGTH = 0.018; // rad/frame at zero speed
-const RADIUS_FACTOR = 3.0;   // higher = wider turning radius at speed
+const DRIFT_FORCE   = 0.015;
+const SPEED_DRAG    = 0.992;  // half-life ~86 frames (1.4s)
+const GYRO          = 0.4;
+const ANGULAR_ACCEL = 0.0012; // angular acceleration per frame from rudder
+const ANGULAR_DRAG  = 0.85;   // angular velocity decay per frame
+const RADIUS_FACTOR = 3.0;    // higher = wider turning radius at speed
 const ANGULAR_SMOOTH = 0.008;
 const WIND_ROLL_THRESHOLD = 4;                        // m/s below which wind has no effect
 const WIND_ROLL_EXTRA = 15 * Math.PI / 180;        // 15° extra roll
@@ -72,10 +73,11 @@ export default function FloatingBody({
   const velY = useRef(0);
   const velPitch = useRef(0);
   const velRoll = useRef(0);
-  const velX = useRef(0);
-  const velZ = useRef(0);
+  const velX       = useRef(0);
+  const velZ       = useRef(0);
+  const velHeading = useRef(0);
   const smoothPitch = useRef(0);
-  const smoothRoll = useRef(0);
+  const smoothRoll  = useRef(0);
 
   const arrows = useMemo(
     () => CORNERS.map(() => new THREE.ArrowHelper(UP, new THREE.Vector3(), 1, ARROW_COLOR)),
@@ -88,10 +90,12 @@ export default function FloatingBody({
     const t = clock.elapsedTime;
     const H = headingRef.current;
 
-    // ── Steering — rudder effect (wider radius at higher speed) ──────────────
+    // ── Steering — angular momentum, wider radius at speed ───────────────────
     const forwardSpeed = velX.current * Math.cos(H) - velZ.current * Math.sin(H);
-    const turnRate = RUDDER_STRENGTH / (1 + Math.abs(forwardSpeed) * RADIUS_FACTOR);
-    headingRef.current += (steeringRef?.current ?? 0) * turnRate;
+    const angAccel     = ANGULAR_ACCEL / (1 + Math.abs(forwardSpeed) * RADIUS_FACTOR);
+    velHeading.current += (steeringRef?.current ?? 0) * angAccel;
+    velHeading.current *= ANGULAR_DRAG;
+    headingRef.current += velHeading.current;
 
     const cosH = Math.cos(headingRef.current);
     const sinH = Math.sin(headingRef.current);

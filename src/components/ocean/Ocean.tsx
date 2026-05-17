@@ -22,13 +22,13 @@ interface OceanLOD {
 }
 
 interface OceanProps {
-    disturbtion?:     number
+    disturbtion?: number
     currentDirection?: number
-    windSpeed?:        number
-    windAngleRef?:     React.RefObject<number>
-    windSpeedRef?:     React.RefObject<number>
-    lod?:              OceanLOD
-    children?:         React.ReactNode
+    windSpeed?: number
+    windAngleRef?: React.RefObject<number>
+    windSpeedRef?: React.RefObject<number>
+    lod?: OceanLOD
+    children?: React.ReactNode
 }
 
 // Tile size for a given axis slot index (0 = center): doubles each step
@@ -58,7 +58,7 @@ const Ocean = ({
     windSpeed = 5,
     windAngleRef,
     windSpeedRef,
-    lod = { baseTileSize: 100, gridRadius: 5, levels: [128, 128, 64, 8, 1] },
+    lod = { baseTileSize: 150, gridRadius: 5, levels: [128, 64, 8, 1] },
     children,
 }: OceanProps) => {
     const { gl, scene } = useThree();

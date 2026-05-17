@@ -89,7 +89,7 @@ export function BoatProvider({ children, windAngleRef, windSpeedRef }: BoatProvi
       const spd = windSpeedRef.current ?? 0;
       thrustRef.current = spd * (throttleRef.current / MAX_THROTTLE) * THRUST_SCALE;
       setWindDisplay({ speed: spd, angle: windAngleRef.current ?? 0 });
-    }, 100);
+    }, 200);
     return () => clearInterval(id);
   }, [windAngleRef, windSpeedRef]);
 

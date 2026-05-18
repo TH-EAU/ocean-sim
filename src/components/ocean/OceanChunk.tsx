@@ -1,117 +1,61 @@
 import { useFrame, useThree } from "@react-three/fiber";
-import { useTexture } from "@react-three/drei";
-import { useCallback, useEffect, useMemo, useRef } from "react";
-import type { RefObject } from "react";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
-import { applyFragmentChunk, applyVertexChunk, handleDepthMaterial } from "@ocean/oceanUtils/shaders";
-import {
-    TERRAIN_BOUNDS,
-    SEC_NOISE_SCALE,
-    SEC_NOISE_STRENGTH,
-} from "@ocean/oceanConsts";
-import heightmapUrl from "@assets/heightmap.png";
-
-interface OceanChunk {
-    id: string;
-    depthRT: THREE.WebGLRenderTarget;
-    gridOffset: [number, number];
-    tileSize: number;
-    resolution: number;
-    numCarrierWaves: number;
-    /** Shared ref to camera XZ position — read each frame without triggering re-renders */
-    cameraOffsetRef?: RefObject<THREE.Vector2>;
-    renderOrder?: number;
-    downgradeQuality?: boolean;
-    waveDirAmp: THREE.Vector4[];
-    waveParams: THREE.Vector4[];
-    waveExtra: THREE.Vector4[];
-    secondaryNoiseScale?: number;
-    secondaryNoiseStrength?: number;
-}
+import { applyFragmentChunk, applyVertexChunk } from "@ocean/oceanUtils/shaders";
+import { useShaderInjection } from "@/src/hooks/useShaderInjection";
+import { useDepthMaterial } from "@/src/hooks/useDepthMaterial";
+import type oceanChunk from "@/src/types/OceanChunk";
+import { useOcean } from "@/src/contexts/OceanContext";
 
 const OceanChunk = ({
-    id,
-    depthRT,
-    gridOffset,
-    cameraOffsetRef,
-    tileSize,
-    resolution,
-    renderOrder = 0,
-    downgradeQuality = false,
-    waveDirAmp,
-    waveParams,
-    waveExtra,
-    numCarrierWaves,
-    secondaryNoiseScale = SEC_NOISE_SCALE,
-    secondaryNoiseStrength = SEC_NOISE_STRENGTH,
-}: OceanChunk) => {
+    id, // good
+    depthRT, // good
+    gridOffset, // good
+    cameraOffsetRef, // good
+    tileSize, // good
+    resolution, // good
+    renderOrder = 0, // good
+    downgradeQuality = false, // good
+}: oceanChunk) => {
     const { gl } = useThree();
     const meshRef = useRef<THREE.Mesh>(null);
-    const heightmap = useTexture(heightmapUrl);
+    const { waveLayers } = useOcean()
 
     const uniforms = useMemo(
         () => ({
             uTime: { value: 0 },
+            // Fragment
             uResolution: {
                 value: new THREE.Vector2(
                     gl.getSize(new THREE.Vector2()).x,
                     gl.getSize(new THREE.Vector2()).y,
                 ),
             },
-            uTileOffset: { value: new THREE.Vector2(0, 0) },
             uDepthTexture: { value: depthRT.depthTexture },
             uDepthScale: { value: 21.1 },
             cameraNear: { value: 0.1 },
             cameraFar: { value: 10000 },
             uSunDirection: { value: new THREE.Vector3(0.6, 0.3, 0.7).normalize() },
             uFresnelPower: { value: 0.5 },
-            // Multi-wave arrays
-            uWaveDirAmp: { value: waveDirAmp },
-            uWaveParams: { value: waveParams },
-            uWaveExtra: { value: waveExtra },
-            uWaveCount: { value: waveDirAmp.length },
-            uNumCarrierWaves: { value: numCarrierWaves },
-            // Secondary noise envelope
-            uSecondaryNoiseScale: { value: secondaryNoiseScale },
-            uSecondaryNoiseStrength: { value: secondaryNoiseStrength },
-            // Heightmap attenuation
-            uHeightmap: { value: heightmap },
-            uTerrainBounds: { value: TERRAIN_BOUNDS },
-            uTerrainDamping: { value: 0.85 },
+
+            // Vertex
+            uTileOffset: { value: new THREE.Vector2(0, 0) },
+            uWaves: {
+                value: waveLayers.map(w => ({
+                    direction: new THREE.Vector2(...w.direction),
+                    amplitude: w.amplitude,
+                    wavelength: w.wavelength,
+                    steepness: w.steepness,
+                    speed: w.speed,
+                }))
+            }
         }),
         // eslint-disable-next-line react-hooks/exhaustive-deps
-        [gl, depthRT, heightmap],
+        [gl, depthRT],
     );
 
-    const injectShader = useCallback(
-        (shader: THREE.WebGLProgramParametersWithUniforms) => {
-            applyVertexChunk(shader, uniforms, true, downgradeQuality);
-            applyFragmentChunk(shader, downgradeQuality);
-        },
-        [uniforms, downgradeQuality],
-    );
-
-    const depthMaterial = useMemo(
-        () => handleDepthMaterial(uniforms, id),
-        [uniforms, id],
-    );
-
-    // Update wave arrays in-place when they change
-    useEffect(() => {
-        uniforms.uWaveDirAmp.value = waveDirAmp;
-        uniforms.uWaveParams.value = waveParams;
-        uniforms.uWaveExtra.value = waveExtra;
-        uniforms.uWaveCount.value = waveDirAmp.length;
-    }, [uniforms, waveDirAmp, waveParams, waveExtra]);
-
-    useEffect(() => {
-        uniforms.uNumCarrierWaves.value = numCarrierWaves;
-    }, [uniforms, numCarrierWaves]);
-
-    useEffect(() => {
-        uniforms.uSecondaryNoiseScale.value = secondaryNoiseScale;
-        uniforms.uSecondaryNoiseStrength.value = secondaryNoiseStrength;
-    }, [uniforms, secondaryNoiseScale, secondaryNoiseStrength]);
+    const injectedShader = useShaderInjection({ uniforms, downgradeQuality, applyVertexChunk, applyFragmentChunk });
+    const depthMaterial = useDepthMaterial({ uniforms, chunkId: id, applyVertexChunk });
 
     useFrame((state) => {
         uniforms.uTime.value = state.clock.elapsedTime;
@@ -120,12 +64,12 @@ const OceanChunk = ({
         uniforms.cameraFar.value = state.camera.far;
 
         if (meshRef.current) {
-            const camX = cameraOffsetRef?.current?.x ?? 0;
+            const camX = cameraOffsetRef?.current?.x ?? 0; // ça n'est pas la caméra qui est mises a jour mais la position des chunks qui bouge
             const camZ = cameraOffsetRef?.current?.y ?? 0;
-            const wx = camX + gridOffset[0];
+            const wx = camX + gridOffset[0]; // C'est le grid Offset qui permet de determiner la bonne place dans le LOD
             const wz = camZ + gridOffset[1];
             meshRef.current.position.set(wx, 0, wz);
-            uniforms.uTileOffset.value.set(wx, wz);
+            uniforms.uTileOffset.value.set(wx, wz); // uTileOffeset permet de calibrer les vagues sur un ocean continu
         }
     });
 
@@ -134,17 +78,17 @@ const OceanChunk = ({
             ref={meshRef}
             rotation={[-Math.PI / 2, 0, 0]}
             renderOrder={renderOrder}
-            frustumCulled={false}
+            // frustumCulled={false} // bad ?
             receiveShadow
             castShadow
             customDepthMaterial={depthMaterial}
         >
             <planeGeometry args={[tileSize, tileSize, resolution, resolution]} />
             <meshStandardMaterial
-                onBeforeCompile={injectShader}
+                onBeforeCompile={injectedShader}
                 customProgramCacheKey={() => downgradeQuality ? `ocean_low` : `ocean_high`}
                 transparent
-                roughness={0}
+                roughness={1}
                 depthWrite={true}
                 side={THREE.FrontSide}
             />

@@ -1,9 +1,9 @@
 import { useMemo } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { useOcean } from "@ocean/OceanContext";
+import { useOcean } from "@/src/contexts/OceanContext";
 import { useBoat } from "@contexts/BoatContext";
-import { buildDerivedWaves, sampleOceanYRaw } from "@ocean/oceanUtils/gerstner";
+import { buildDerivedWaves, sampleOceanPosition } from "@ocean/oceanUtils/gerstner";
 
 const N = 60; // cells (1 m each → 60 m wide grid)
 
@@ -25,7 +25,7 @@ export default function WorldDebugGrid() {
     const bx = transformRef?.current?.x ?? 0;
     const bz = transformRef?.current?.z ?? 0;
 
-    // Grid origin snapped to world integers so lines stay on integer coordinates
+    // Grid origin snapped to world integers so lines stay on integer undisplaced coordinates
     const ox = Math.floor(bx) - N / 2;
     const oz = Math.floor(bz) - N / 2;
 
@@ -36,10 +36,10 @@ export default function WorldDebugGrid() {
     for (let zi = 0; zi <= N; zi++) {
       const wz = oz + zi;
       for (let xi = 0; xi < N; xi++) {
-        const wx0 = ox + xi;
-        const wx1 = ox + xi + 1;
-        positions[idx++] = wx0; positions[idx++] = sampleOceanYRaw(wx0, wz, derived, t); positions[idx++] = wz;
-        positions[idx++] = wx1; positions[idx++] = sampleOceanYRaw(wx1, wz, derived, t); positions[idx++] = wz;
+        const p0 = sampleOceanPosition(ox + xi, wz, derived, t);
+        const p1 = sampleOceanPosition(ox + xi + 1, wz, derived, t);
+        positions[idx++] = p0.x; positions[idx++] = p0.y; positions[idx++] = p0.z;
+        positions[idx++] = p1.x; positions[idx++] = p1.y; positions[idx++] = p1.z;
       }
     }
 
@@ -47,10 +47,10 @@ export default function WorldDebugGrid() {
     for (let xi = 0; xi <= N; xi++) {
       const wx = ox + xi;
       for (let zi = 0; zi < N; zi++) {
-        const wz0 = oz + zi;
-        const wz1 = oz + zi + 1;
-        positions[idx++] = wx; positions[idx++] = sampleOceanYRaw(wx, wz0, derived, t); positions[idx++] = wz0;
-        positions[idx++] = wx; positions[idx++] = sampleOceanYRaw(wx, wz1, derived, t); positions[idx++] = wz1;
+        const p0 = sampleOceanPosition(wx, oz + zi, derived, t);
+        const p1 = sampleOceanPosition(wx, oz + zi + 1, derived, t);
+        positions[idx++] = p0.x; positions[idx++] = p0.y; positions[idx++] = p0.z;
+        positions[idx++] = p1.x; positions[idx++] = p1.y; positions[idx++] = p1.z;
       }
     }
 

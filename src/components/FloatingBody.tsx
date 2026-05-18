@@ -63,7 +63,7 @@ export default function FloatingBody({
   const posRef = useRef<THREE.Group>(null);
   const tiltRef = useRef<THREE.Group>(null);
   const headingRef = useRef(initialHeading);
-  const { disturbtion, currentDirection } = useOcean();
+  const { disturbtion, currentDirection, waveLayers } = useOcean();
 
   const posX = useRef(position[0]);
   const posZ = useRef(position[1]);
@@ -108,7 +108,7 @@ export default function FloatingBody({
     const cz = posZ.current;
 
     const sample = (x: number, z: number) =>
-      sampleOceanY(x, z, currentDirection, disturbtion, t);
+      sampleOceanY(x, z, currentDirection, disturbtion, t, waveLayers);
 
     const hBP = sample(cx + bowX - stbdX, cz + bowZ - stbdZ);
     const hBS = sample(cx + bowX + stbdX, cz + bowZ + stbdZ);

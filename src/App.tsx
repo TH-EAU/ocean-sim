@@ -12,6 +12,7 @@ import BakedSky from "./components/BakedSky";
 import { BoatProvider, useBoat } from "./contexts/BoatContext";
 
 const BASE_WIND_SPEED = 5;
+// Waves are defined in src/components/ocean/oceanConsts.ts → DEFAULT_WAVE_LAYERS
 
 function BoatWithControls() {
   const { thrustRef, steeringRef, transformRef, windAngleRef, windSpeedRef } = useBoat();
@@ -53,9 +54,9 @@ export default function App() {
           <SceneLighting />
 
           <Suspense fallback={null}>
-            <Terrain heightScale={34} terrainDepth={-22} />
+            <Terrain heightScale={4} terrainDepth={-2} />
             <Ocean
-              disturbtion={1}
+              disturbtion={5}
               windSpeed={BASE_WIND_SPEED}
               windAngleRef={windAngleRef}
               windSpeedRef={windSpeedRef}
@@ -65,7 +66,7 @@ export default function App() {
             <BoatCamera
               orbitControlsRef={orbitControlsRef}
               distance={8}
-              height={2}
+              height={3}
               lookAhead={6}
               smoothing={0.3}
             />

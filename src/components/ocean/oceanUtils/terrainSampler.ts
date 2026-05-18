@@ -37,14 +37,18 @@ export function initTerrainSampler(
 
 // Three.js uploads textures with flipY=true by default.
 // GPU UV.y=0 → bottom of original image → we must flip V when reading CPU pixels.
-export function sampleTerrainY(x: number, z: number): number {
-  if (!_data) return _terrainDepth;
+export function sampleTerrainH(x: number, z: number): number {
+  if (!_data) return 0;
   const u  = Math.max(0, Math.min(1, (x - BOUNDS_MIN_X) / (BOUNDS_MAX_X - BOUNDS_MIN_X)));
   const v  = Math.max(0, Math.min(1, (z - BOUNDS_MIN_Z) / (BOUNDS_MAX_Z - BOUNDS_MIN_Z)));
   const px = Math.floor(u       * (_imgW - 1));
   const py = Math.floor((1 - v) * (_imgH - 1));
-  const h  = _data[(py * _imgW + px) * 4] / 255;
-  return h * _heightScale + _terrainDepth;
+  return _data[(py * _imgW + px) * 4] / 255;
+}
+
+export function sampleTerrainY(x: number, z: number): number {
+  if (!_data) return _terrainDepth;
+  return sampleTerrainH(x, z) * _heightScale + _terrainDepth;
 }
 
 export function buildTrimesh(res = 64): { vertices: Float32Array; indices: Uint32Array } | null {

@@ -1,7 +1,16 @@
 import { useFrame, useThree } from "@react-three/fiber";
+import { useTexture } from "@react-three/drei";
 import { useCallback, useEffect, useMemo, useRef } from "react";
+import type { RefObject } from "react";
 import * as THREE from "three";
 import { applyFragmentChunk, applyVertexChunk, handleDepthMaterial } from "./oceanUtils/shaders";
+import {
+    TERRAIN_BOUNDS,
+    SEC_NOISE_SCALE,
+    SEC_NOISE_STRENGTH,
+    DEFAULT_WAVE_LAYERS,
+} from "./oceanConsts";
+import heightmapUrl from "../../assets/heightmap.png";
 
 interface OceanChunk {
     id: string;
@@ -9,13 +18,17 @@ interface OceanChunk {
     /** Fixed offset of this chunk in the LOD grid (relative to origin, does not change) */
     gridOffset?: [number, number];
     /** Shared ref to camera XZ position — read each frame without triggering re-renders */
-    cameraOffsetRef?: React.RefObject<THREE.Vector2>;
+    cameraOffsetRef?: RefObject<THREE.Vector2>;
     tileSize?: number;
     resolution?: number;
     renderOrder?: number;
     downgradeQuality?: boolean;
-    disturbtion?: number;
-    currentDirection?: [number, number];
+    waveDirAmp: THREE.Vector4[];
+    waveParams: THREE.Vector4[];
+    waveExtra: THREE.Vector4[];
+    numCarrierWaves?: number;
+    secondaryNoiseScale?: number;
+    secondaryNoiseStrength?: number;
 }
 
 const chunkUniformsStore = new Map<string, Record<string, THREE.IUniform>>();
@@ -29,11 +42,16 @@ const OceanChunk = ({
     resolution = 256,
     renderOrder = 0,
     downgradeQuality = false,
-    disturbtion = 0.3,
-    currentDirection = [0, 1],
+    waveDirAmp,
+    waveParams,
+    waveExtra,
+    numCarrierWaves = DEFAULT_WAVE_LAYERS.length,
+    secondaryNoiseScale,
+    secondaryNoiseStrength,
 }: OceanChunk) => {
     const { gl } = useThree();
     const meshRef = useRef<THREE.Mesh>(null);
+    const heightmap = useTexture(heightmapUrl);
 
     const uniforms = useMemo(
         () => ({
@@ -51,10 +69,22 @@ const OceanChunk = ({
             cameraFar: { value: 10000 },
             uSunDirection: { value: new THREE.Vector3(0.6, 0.3, 0.7).normalize() },
             uFresnelPower: { value: 0.5 },
-            uCurrentDirection: { value: new THREE.Vector2(currentDirection[0], currentDirection[1]) },
-            uDisturbtion: { value: disturbtion },
+            // Multi-wave arrays
+            uWaveDirAmp: { value: waveDirAmp },
+            uWaveParams: { value: waveParams },
+            uWaveExtra: { value: waveExtra },
+            uWaveCount: { value: waveDirAmp.length },
+            uNumCarrierWaves: { value: numCarrierWaves },
+            // Secondary noise envelope
+            uSecondaryNoiseScale: { value: secondaryNoiseScale ?? SEC_NOISE_SCALE },
+            uSecondaryNoiseStrength: { value: secondaryNoiseStrength ?? SEC_NOISE_STRENGTH },
+            // Heightmap attenuation
+            uHeightmap: { value: heightmap },
+            uTerrainBounds: { value: TERRAIN_BOUNDS },
+            uTerrainDamping: { value: 0.85 },
         }),
-        [gl, depthRT],
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [gl, depthRT, heightmap],
     );
 
     const injectShader = useCallback(
@@ -75,13 +105,22 @@ const OceanChunk = ({
         return () => { chunkUniformsStore.delete(id); };
     }, [id, uniforms]);
 
+    // Update wave arrays in-place when they change
     useEffect(() => {
-        uniforms.uCurrentDirection.value.set(currentDirection[0], currentDirection[1]);
-    }, [uniforms, currentDirection]);
+        uniforms.uWaveDirAmp.value = waveDirAmp;
+        uniforms.uWaveParams.value = waveParams;
+        uniforms.uWaveExtra.value = waveExtra;
+        uniforms.uWaveCount.value = waveDirAmp.length;
+    }, [uniforms, waveDirAmp, waveParams, waveExtra]);
 
     useEffect(() => {
-        uniforms.uDisturbtion.value = disturbtion;
-    }, [uniforms, disturbtion]);
+        uniforms.uNumCarrierWaves.value = numCarrierWaves;
+    }, [uniforms, numCarrierWaves]);
+
+    useEffect(() => {
+        uniforms.uSecondaryNoiseScale.value = secondaryNoiseScale ?? SEC_NOISE_SCALE;
+        uniforms.uSecondaryNoiseStrength.value = secondaryNoiseStrength ?? SEC_NOISE_STRENGTH;
+    }, [uniforms, secondaryNoiseScale, secondaryNoiseStrength]);
 
     useFrame((state) => {
         const u = chunkUniformsStore.get(id);
@@ -121,7 +160,6 @@ const OceanChunk = ({
                 roughness={0}
                 depthWrite={true}
                 side={THREE.FrontSide}
-            // wireframe
             />
         </mesh>
     );

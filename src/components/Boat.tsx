@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useFBX } from "@react-three/drei";
 import * as THREE from "three";
 
-import boatUrl from "../assets/boat/Boat FBX.fbx?url";
+import boatUrl from "../assets/boat/america.fbx?url";
 
 interface BoatProps {
   position?: [number, number, number];

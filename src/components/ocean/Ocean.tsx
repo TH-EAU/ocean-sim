@@ -7,6 +7,10 @@
  *
  * @param windSpeed
  * Vitesse de base du vent en m/s. Varie dynamiquement dans useFrame (±20%).
+ *
+ * @param waveLayers
+ * Tableau de vagues Gerstner. Chaque entrée définit ses paramètres comme influences sur
+ * disturbtion (amplitude × d, wavelength × d) et sur la direction du vent (dirAngle + windAngle).
  */
 
 import * as THREE from "three";
@@ -14,6 +18,8 @@ import React, { useMemo, useRef } from "react";
 import OceanChunk from "./OceanChunk";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OceanContext } from "./OceanContext";
+import { deriveWaves, DEFAULT_WAVE_LAYERS } from "./oceanConsts";
+import type { WaveLayer } from "../../types/wave";
 
 interface OceanLOD {
     baseTileSize: number
@@ -27,7 +33,10 @@ interface OceanProps {
     windSpeed?: number
     windAngleRef?: React.RefObject<number>
     windSpeedRef?: React.RefObject<number>
+    waveLayers?: WaveLayer[]
     lod?: OceanLOD
+    secondaryNoiseScale?: number
+    secondaryNoiseStrength?: number
     children?: React.ReactNode
 }
 
@@ -58,7 +67,10 @@ const Ocean = ({
     windSpeed = 5,
     windAngleRef,
     windSpeedRef,
-    lod = { baseTileSize: 150, gridRadius: 5, levels: [128, 64, 8, 1] },
+    waveLayers,
+    lod = { baseTileSize: 60, gridRadius: 5, levels: [256, 128, 32, 1] },
+    secondaryNoiseScale,
+    secondaryNoiseStrength,
     children,
 }: OceanProps) => {
     const { gl, scene } = useThree();
@@ -81,6 +93,14 @@ const Ocean = ({
             depthBuffer: true,
         });
     }, []);
+
+    const activeLayers = waveLayers ?? DEFAULT_WAVE_LAYERS;
+
+    // Derive wave uniform arrays from layers + disturbtion + wind angle
+    const { waveDirAmp, waveParams, waveExtra, numCarrierWaves } = useMemo(() => {
+        const { dirAmp, params, extra, numCarrier } = deriveWaves(activeLayers, disturbtion, baseAngle);
+        return { waveDirAmp: dirAmp, waveParams: params, waveExtra: extra, numCarrierWaves: numCarrier };
+    }, [activeLayers, disturbtion, baseAngle]);
 
     const chunks = useMemo(() => {
         const list: {
@@ -126,7 +146,7 @@ const Ocean = ({
     });
 
     return (
-        <OceanContext.Provider value={{ disturbtion, currentDirection, currentSpeed: 0, windSpeed }}>
+        <OceanContext.Provider value={{ disturbtion, currentDirection, currentSpeed: 0, windSpeed, waveLayers: activeLayers }}>
             <group ref={groupRef}>
                 {chunks.map(({ row, col, ring, resolution, tileSize, gridOffset }) => (
                     <OceanChunk
@@ -137,9 +157,13 @@ const Ocean = ({
                         cameraOffsetRef={cameraOffsetRef}
                         resolution={resolution}
                         depthRT={sharedDepthRT}
-                        downgradeQuality={ring >= 4}
-                        disturbtion={disturbtion}
-                        currentDirection={currentDirection}
+                        downgradeQuality={ring >= 3}
+                        waveDirAmp={waveDirAmp}
+                        waveParams={waveParams}
+                        waveExtra={waveExtra}
+                        numCarrierWaves={numCarrierWaves}
+                        secondaryNoiseScale={secondaryNoiseScale}
+                        secondaryNoiseStrength={secondaryNoiseStrength}
                     />
                 ))}
             </group>

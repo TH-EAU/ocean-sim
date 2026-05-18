@@ -2,8 +2,7 @@ import { useEffect } from "react";
 import { useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { Sky } from "three/examples/jsm/objects/Sky.js";
-
-const SUN_POSITION = new THREE.Vector3(100, 10, 100);
+import { DEFAULT_SUN_DIR } from "@ocean/oceanConsts";
 
 export default function BakedSky() {
   const { gl, scene } = useThree();
@@ -12,11 +11,11 @@ export default function BakedSky() {
     const sky = new Sky();
     sky.scale.setScalar(450000);
     const u = sky.material.uniforms;
-    u["turbidity"].value       = 6;
-    u["rayleigh"].value        = 1.5;
-    u["mieCoefficient"].value  = 0.004;
+    u["turbidity"].value = 6;
+    u["rayleigh"].value = 1.5;
+    u["mieCoefficient"].value = 0.004;
     u["mieDirectionalG"].value = 0.85;
-    u["sunPosition"].value.copy(SUN_POSITION);
+    u["sunPosition"].value.set(...DEFAULT_SUN_DIR);
 
     const cubeRT = new THREE.WebGLCubeRenderTarget(512, {
       type: THREE.HalfFloatType,

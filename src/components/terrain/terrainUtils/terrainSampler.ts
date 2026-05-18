@@ -50,38 +50,3 @@ export function sampleTerrainY(x: number, z: number): number {
   if (!_data) return _terrainDepth;
   return sampleTerrainH(x, z) * _heightScale + _terrainDepth;
 }
-
-export function buildTrimesh(res = 64): { vertices: Float32Array; indices: Uint32Array } | null {
-  if (!_data) return null;
-  const rangeX = BOUNDS_MAX_X - BOUNDS_MIN_X;
-  const rangeZ = BOUNDS_MAX_Z - BOUNDS_MIN_Z;
-  const stepX  = rangeX / (res - 1);
-  const stepZ  = rangeZ / (res - 1);
-
-  const vertices = new Float32Array(res * res * 3);
-  for (let r = 0; r < res; r++) {
-    for (let c = 0; c < res; c++) {
-      const i = r * res + c;
-      const x = BOUNDS_MIN_X + c * stepX;
-      const z = BOUNDS_MIN_Z + r * stepZ;
-      vertices[i * 3 + 0] = x;
-      vertices[i * 3 + 1] = sampleTerrainY(x, z);
-      vertices[i * 3 + 2] = z;
-    }
-  }
-
-  const quads   = (res - 1) * (res - 1);
-  const indices = new Uint32Array(quads * 6);
-  let   idx     = 0;
-  for (let r = 0; r < res - 1; r++) {
-    for (let c = 0; c < res - 1; c++) {
-      const a  =  r      * res + c;
-      const b  = a + 1;
-      const c2 = (r + 1) * res + c;
-      const d  = c2 + 1;
-      indices[idx++] = a;  indices[idx++] = c2; indices[idx++] = b;
-      indices[idx++] = b;  indices[idx++] = c2; indices[idx++] = d;
-    }
-  }
-  return { vertices, indices };
-}

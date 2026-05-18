@@ -1,7 +1,7 @@
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useEffect, useMemo, useRef } from "react";
-import { useBoat } from "../contexts/BoatContext";
+import { useBoat } from "@contexts/BoatContext";
 
 const MOUSE_SENSITIVITY = 0.003;
 const PITCH_LIMIT = 10 * Math.PI / 180; // ±10°

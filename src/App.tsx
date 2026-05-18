@@ -1,14 +1,15 @@
 import { useRef, Suspense } from "react";
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stats } from "@react-three/drei";
-import Boat from "./components/Boat";
-import FloatingBody from "./components/FloatingBody";
-import Terrain from "./components/Terrain";
+import Boat from "./components/boat/Boat";
+import FloatingBody from "./components/physics/FloatingBody";
+import Terrain from "./components/terrain/Terrain";
 import Ocean from "./components/ocean/Ocean";
-import BoatCamera from "./components/BoatCamera";
-import BoatHUD from "./components/BoatHUD";
-import SceneLighting from "./components/SceneLighting";
-import BakedSky from "./components/BakedSky";
+import BoatCamera from "./components/pawn/BoatCamera";
+import BoatHUD from "./components/pawn/BoatHUD";
+import OceanWaveDebug from "./components/ocean/OceanWaveDebug";
+import SceneLighting from "./components/graphics/SceneLighting";
+import BakedSky from "./components/sky/BakedSky";
 import { BoatProvider, useBoat } from "./contexts/BoatContext";
 
 const BASE_WIND_SPEED = 5;
@@ -21,7 +22,8 @@ function BoatWithControls() {
       width={6}
       length={20}
       draft={-1.1}
-      damping={0.05}
+      mass={50.0}
+      waterDrag={0.08}
       position={[0, 0]}
       initialHeading={Math.PI}
       thrustRef={thrustRef}
@@ -29,6 +31,7 @@ function BoatWithControls() {
       transformRef={transformRef}
       windAngleRef={windAngleRef}
       windSpeedRef={windSpeedRef}
+      stiffness={.2}
     >
       <Boat scale={0.01} position={[5, 0, 0]} />
     </FloatingBody>
@@ -54,14 +57,15 @@ export default function App() {
           <SceneLighting />
 
           <Suspense fallback={null}>
-            <Terrain heightScale={4} terrainDepth={-2} />
+            {/* <Terrain /> */}
             <Ocean
-              disturbtion={5}
+              disturbtion={1}
               windSpeed={BASE_WIND_SPEED}
               windAngleRef={windAngleRef}
               windSpeedRef={windSpeedRef}
             >
               <BoatWithControls />
+              <OceanWaveDebug />
             </Ocean>
             <BoatCamera
               orbitControlsRef={orbitControlsRef}

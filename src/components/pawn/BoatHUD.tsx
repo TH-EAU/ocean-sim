@@ -1,4 +1,4 @@
-import { useBoat } from "../contexts/BoatContext";
+import { useBoat } from "@contexts/BoatContext";
 
 const LEVEL_LABELS = ["STOP", "SLOW", "MED", "FULL"] as const;
 

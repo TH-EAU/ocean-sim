@@ -1,5 +1,3 @@
-uniform vec2 uTileOffset;
-
 uniform sampler2D uDepthTexture;
 uniform vec2 uResolution;
 uniform float uDepthScale;
@@ -12,5 +10,3 @@ uniform float uFresnelPower;
 
 varying vec3 vOceanNormal;
 varying vec3 vOceanWorldPos;
-
-uniform float uTerrainDepth;

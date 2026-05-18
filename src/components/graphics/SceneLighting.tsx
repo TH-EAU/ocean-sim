@@ -1,7 +1,7 @@
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { useBoat } from "../contexts/BoatContext";
+import { useBoat } from "@contexts/BoatContext";
 
 const SUN_OFFSET = new THREE.Vector3(100, 30, 100);
 
@@ -11,7 +11,7 @@ export default function SceneLighting() {
 
   useFrame(() => {
     const light = lightRef.current;
-    const t     = transformRef.current;
+    const t = transformRef.current;
     if (!light || !t) return;
     light.position.set(t.x + SUN_OFFSET.x, SUN_OFFSET.y, t.z + SUN_OFFSET.z);
     light.target.position.set(t.x, t.y, t.z);

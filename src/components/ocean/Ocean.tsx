@@ -15,17 +15,13 @@
 
 import * as THREE from "three";
 import React, { useMemo, useRef } from "react";
-import OceanChunk from "./OceanChunk";
+import OceanChunk from "@ocean/OceanChunk";
 import { useFrame, useThree } from "@react-three/fiber";
-import { OceanContext } from "./OceanContext";
-import { deriveWaves, DEFAULT_WAVE_LAYERS } from "./oceanConsts";
-import type { WaveLayer } from "../../types/wave";
-
-interface OceanLOD {
-    baseTileSize: number
-    gridRadius: number
-    levels: number[]
-}
+import { OceanContext } from "@ocean/OceanContext";
+import { DEFAULT_WAVE_LAYERS, DEFAULT_LOD } from "@ocean/oceanConsts";
+import type { OceanLOD } from "@ocean/oceanConsts";
+import { deriveWaves } from "@ocean/oceanUtils/waveDeriver";
+import type { WaveLayer } from "@customTypes/wave";
 
 interface OceanProps {
     disturbtion?: number
@@ -40,13 +36,9 @@ interface OceanProps {
     children?: React.ReactNode
 }
 
-// Tile size for a given axis slot index (0 = center): doubles each step
+// Tile size for a given ring/axis index (0 = center): doubles each step
 const tileSizeForAxisIndex = (base: number, n: number): number =>
     base * Math.pow(2, n);
-
-// Tile size for a chunk at the given ring level
-const computeTileSize = (base: number, ring: number): number =>
-    base * Math.pow(2, ring);
 
 // World-space center offset for chunk (row, col), accumulating axis sizes independently.
 const computeGridOffset = (row: number, col: number, base: number): [number, number] => {
@@ -68,7 +60,7 @@ const Ocean = ({
     windAngleRef,
     windSpeedRef,
     waveLayers,
-    lod = { baseTileSize: 60, gridRadius: 5, levels: [256, 128, 32, 1] },
+    lod = DEFAULT_LOD,
     secondaryNoiseScale,
     secondaryNoiseStrength,
     children,
@@ -115,7 +107,7 @@ const Ocean = ({
             for (let col = -lod.gridRadius; col <= lod.gridRadius; col++) {
                 const ring = Math.max(Math.abs(row), Math.abs(col));
                 const resolution = lod.levels[Math.min(ring, lod.levels.length - 1)];
-                const tileSize = computeTileSize(lod.baseTileSize, ring);
+                const tileSize = tileSizeForAxisIndex(lod.baseTileSize, ring);
                 const gridOffset = computeGridOffset(row, col, lod.baseTileSize);
                 list.push({ row, col, ring, resolution, tileSize, gridOffset });
             }
@@ -146,7 +138,7 @@ const Ocean = ({
     });
 
     return (
-        <OceanContext.Provider value={{ disturbtion, currentDirection, currentSpeed: 0, windSpeed, waveLayers: activeLayers }}>
+        <OceanContext.Provider value={{ disturbtion, currentDirection, windSpeed, waveLayers: activeLayers }}>
             <group ref={groupRef}>
                 {chunks.map(({ row, col, ring, resolution, tileSize, gridOffset }) => (
                     <OceanChunk

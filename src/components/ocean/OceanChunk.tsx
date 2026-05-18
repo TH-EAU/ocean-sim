@@ -3,51 +3,47 @@ import { useTexture } from "@react-three/drei";
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { RefObject } from "react";
 import * as THREE from "three";
-import { applyFragmentChunk, applyVertexChunk, handleDepthMaterial } from "./oceanUtils/shaders";
+import { applyFragmentChunk, applyVertexChunk, handleDepthMaterial } from "@ocean/oceanUtils/shaders";
 import {
     TERRAIN_BOUNDS,
     SEC_NOISE_SCALE,
     SEC_NOISE_STRENGTH,
-    DEFAULT_WAVE_LAYERS,
-} from "./oceanConsts";
-import heightmapUrl from "../../assets/heightmap.png";
+} from "@ocean/oceanConsts";
+import heightmapUrl from "@assets/heightmap.png";
 
 interface OceanChunk {
     id: string;
     depthRT: THREE.WebGLRenderTarget;
-    /** Fixed offset of this chunk in the LOD grid (relative to origin, does not change) */
-    gridOffset?: [number, number];
+    gridOffset: [number, number];
+    tileSize: number;
+    resolution: number;
+    numCarrierWaves: number;
     /** Shared ref to camera XZ position — read each frame without triggering re-renders */
     cameraOffsetRef?: RefObject<THREE.Vector2>;
-    tileSize?: number;
-    resolution?: number;
     renderOrder?: number;
     downgradeQuality?: boolean;
     waveDirAmp: THREE.Vector4[];
     waveParams: THREE.Vector4[];
     waveExtra: THREE.Vector4[];
-    numCarrierWaves?: number;
     secondaryNoiseScale?: number;
     secondaryNoiseStrength?: number;
 }
 
-const chunkUniformsStore = new Map<string, Record<string, THREE.IUniform>>();
-
 const OceanChunk = ({
     id,
     depthRT,
-    gridOffset = [0, 0],
+    gridOffset,
     cameraOffsetRef,
-    tileSize = 60,
-    resolution = 256,
+    tileSize,
+    resolution,
     renderOrder = 0,
     downgradeQuality = false,
     waveDirAmp,
     waveParams,
     waveExtra,
-    numCarrierWaves = DEFAULT_WAVE_LAYERS.length,
-    secondaryNoiseScale,
-    secondaryNoiseStrength,
+    numCarrierWaves,
+    secondaryNoiseScale = SEC_NOISE_SCALE,
+    secondaryNoiseStrength = SEC_NOISE_STRENGTH,
 }: OceanChunk) => {
     const { gl } = useThree();
     const meshRef = useRef<THREE.Mesh>(null);
@@ -76,8 +72,8 @@ const OceanChunk = ({
             uWaveCount: { value: waveDirAmp.length },
             uNumCarrierWaves: { value: numCarrierWaves },
             // Secondary noise envelope
-            uSecondaryNoiseScale: { value: secondaryNoiseScale ?? SEC_NOISE_SCALE },
-            uSecondaryNoiseStrength: { value: secondaryNoiseStrength ?? SEC_NOISE_STRENGTH },
+            uSecondaryNoiseScale: { value: secondaryNoiseScale },
+            uSecondaryNoiseStrength: { value: secondaryNoiseStrength },
             // Heightmap attenuation
             uHeightmap: { value: heightmap },
             uTerrainBounds: { value: TERRAIN_BOUNDS },
@@ -97,13 +93,8 @@ const OceanChunk = ({
 
     const depthMaterial = useMemo(
         () => handleDepthMaterial(uniforms, id),
-        [uniforms],
+        [uniforms, id],
     );
-
-    useEffect(() => {
-        chunkUniformsStore.set(id, uniforms);
-        return () => { chunkUniformsStore.delete(id); };
-    }, [id, uniforms]);
 
     // Update wave arrays in-place when they change
     useEffect(() => {
@@ -118,27 +109,23 @@ const OceanChunk = ({
     }, [uniforms, numCarrierWaves]);
 
     useEffect(() => {
-        uniforms.uSecondaryNoiseScale.value = secondaryNoiseScale ?? SEC_NOISE_SCALE;
-        uniforms.uSecondaryNoiseStrength.value = secondaryNoiseStrength ?? SEC_NOISE_STRENGTH;
+        uniforms.uSecondaryNoiseScale.value = secondaryNoiseScale;
+        uniforms.uSecondaryNoiseStrength.value = secondaryNoiseStrength;
     }, [uniforms, secondaryNoiseScale, secondaryNoiseStrength]);
 
     useFrame((state) => {
-        const u = chunkUniformsStore.get(id);
-        if (!u) return;
+        uniforms.uTime.value = state.clock.elapsedTime;
+        uniforms.uResolution.value.set(state.size.width, state.size.height);
+        uniforms.cameraNear.value = state.camera.near;
+        uniforms.cameraFar.value = state.camera.far;
 
-        u.uTime.value = state.clock.elapsedTime;
-        u.uResolution.value.set(state.size.width, state.size.height);
-        u.cameraNear.value = state.camera.near;
-        u.cameraFar.value = state.camera.far;
-
-        // Update world position directly — no React state, no re-renders
         if (meshRef.current) {
             const camX = cameraOffsetRef?.current?.x ?? 0;
             const camZ = cameraOffsetRef?.current?.y ?? 0;
             const wx = camX + gridOffset[0];
             const wz = camZ + gridOffset[1];
             meshRef.current.position.set(wx, 0, wz);
-            u.uTileOffset.value.set(wx, wz);
+            uniforms.uTileOffset.value.set(wx, wz);
         }
     });
 

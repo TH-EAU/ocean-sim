@@ -1,16 +1,16 @@
 import { useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import type { BoatTransform } from "../types/boat";
-import { useOcean } from "./ocean/OceanContext";
-import { sampleOceanY } from "./ocean/oceanUtils/gerstner";
-import { sampleTerrainY } from "./ocean/oceanUtils/terrainSampler";
+import type { BoatTransform } from "@customTypes/boat";
+import { useOcean } from "@ocean/OceanContext";
+import { buildDerivedWaves, sampleOceanYRaw } from "@ocean/oceanUtils/gerstner";
 
-const DRIFT_FORCE   = 0.015;
-const SPEED_DRAG    = 0.992;  // half-life ~86 frames (1.4s)
-const GYRO          = 0.4;
+const GRAVITY = 0.089;
+const DRIFT_FORCE = 0.015;
+const SPEED_DRAG = 0.992;  // half-life ~86 frames (1.4s)
+const GYRO = 0.4;
 const ANGULAR_ACCEL = 0.0012; // angular acceleration per frame from rudder
-const ANGULAR_DRAG  = 0.85;   // angular velocity decay per frame
+const ANGULAR_DRAG = 0.85;   // angular velocity decay per frame
 const RADIUS_FACTOR = 3.0;    // higher = wider turning radius at speed
 const ANGULAR_SMOOTH = 0.008;
 const WIND_ROLL_THRESHOLD = 4;                        // m/s below which wind has no effect
@@ -32,13 +32,14 @@ interface FloatingBodyProps {
   width?: number;
   length?: number;
   draft?: number;
-  damping?: number;
+  mass?: number;
+  waterDrag?: number;
   stiffness?: number;
   position?: [number, number];
   initialHeading?: number;
   modelYaw?: number;
-  thrustRef?: React.RefObject<number>;
-  steeringRef?: React.RefObject<number>;
+  thrustRef: React.RefObject<number>;
+  steeringRef: React.RefObject<number>;
   transformRef?: React.RefObject<BoatTransform>;
   windAngleRef?: React.RefObject<number>;
   windSpeedRef?: React.RefObject<number>;
@@ -49,7 +50,8 @@ export default function FloatingBody({
   width = 4,
   length = 10,
   draft = 0.5,
-  damping = 0.92,
+  mass = 1.0,
+  waterDrag = 0.08,
   stiffness = 0.08,
   position = [0, 0],
   initialHeading = 0,
@@ -73,11 +75,11 @@ export default function FloatingBody({
   const velY = useRef(0);
   const velPitch = useRef(0);
   const velRoll = useRef(0);
-  const velX       = useRef(0);
-  const velZ       = useRef(0);
+  const velX = useRef(0);
+  const velZ = useRef(0);
   const velHeading = useRef(0);
   const smoothPitch = useRef(0);
-  const smoothRoll  = useRef(0);
+  const smoothRoll = useRef(0);
 
   const arrows = useMemo(
     () => CORNERS.map(() => new THREE.ArrowHelper(UP, new THREE.Vector3(), 1, ARROW_COLOR)),
@@ -92,8 +94,8 @@ export default function FloatingBody({
 
     // ── Steering — angular momentum, wider radius at speed ───────────────────
     const forwardSpeed = velX.current * Math.cos(H) - velZ.current * Math.sin(H);
-    const angAccel     = ANGULAR_ACCEL / (1 + Math.abs(forwardSpeed) * RADIUS_FACTOR);
-    velHeading.current += (steeringRef?.current ?? 0) * angAccel;
+    const angAccel = ANGULAR_ACCEL / (1 + Math.abs(forwardSpeed) * RADIUS_FACTOR);
+    velHeading.current += steeringRef.current * angAccel;
     velHeading.current *= ANGULAR_DRAG;
     headingRef.current += velHeading.current;
 
@@ -107,8 +109,8 @@ export default function FloatingBody({
     const cx = posX.current;
     const cz = posZ.current;
 
-    const sample = (x: number, z: number) =>
-      sampleOceanY(x, z, currentDirection, disturbtion, t, waveLayers);
+    const derived = buildDerivedWaves(currentDirection, disturbtion, waveLayers);
+    const sample = (x: number, z: number) => sampleOceanYRaw(x, z, derived, t);
 
     const hBP = sample(cx + bowX - stbdX, cz + bowZ - stbdZ);
     const hBS = sample(cx + bowX + stbdX, cz + bowZ + stbdZ);
@@ -144,21 +146,18 @@ export default function FloatingBody({
     const gyroFactor = 1 / (1 + speed * GYRO);
     const effectiveStiffness = stiffness * gyroFactor;
 
-    velPitch.current = velPitch.current * damping + (smoothPitch.current - pitch.current) * effectiveStiffness;
-    velRoll.current = velRoll.current * damping + (smoothRoll.current - roll.current) * effectiveStiffness;
-    velY.current = velY.current * damping + (targetY - posY.current) * stiffness;
+    velPitch.current = velPitch.current * (1 - waterDrag) + (smoothPitch.current - pitch.current) * effectiveStiffness;
+    velRoll.current = velRoll.current * (1 - waterDrag) + (smoothRoll.current - roll.current) * effectiveStiffness;
+
+    velY.current -= GRAVITY / mass;
+    if (posY.current < targetY) {
+      velY.current += (targetY - posY.current) * stiffness / mass;
+    }
+    velY.current *= (1 - waterDrag);
 
     pitch.current += velPitch.current;
     roll.current += velRoll.current;
     posY.current += velY.current;
-
-    // Terrain collision — clamp hull bottom above ground
-    const groundY = sampleTerrainY(posX.current, posZ.current);
-    const minY = groundY + draft;
-    if (posY.current < minY) {
-      posY.current = minY;
-      velY.current = Math.max(0, velY.current);
-    }
 
     // ── Wave drift ───────────────────────────────────────────────────────────
     const fwdDrift = -Math.sin(pitch.current) * DRIFT_FORCE;
@@ -168,7 +167,7 @@ export default function FloatingBody({
     velZ.current = velZ.current * SPEED_DRAG - fwdDrift * sinH + sideDrift * cosH;
 
     // ── Wind thrust — forward force in heading direction ─────────────────────
-    const thrust = thrustRef?.current ?? 0;
+    const thrust = thrustRef.current;
     velX.current += thrust * cosH;
     velZ.current += thrust * -sinH;
 
@@ -214,7 +213,7 @@ export default function FloatingBody({
           <group rotation={[0, modelYaw, 0]}>{children}</group>
           <mesh>
             <boxGeometry args={[length, 2, width]} />
-            <meshBasicMaterial color={0xffff00} wireframe />
+            <meshBasicMaterial color={0x00ff00} wireframe />
           </mesh>
         </group>
       </group>

@@ -5,9 +5,12 @@ import type { BoatTransform } from "@customTypes/boat";
 import { useOcean } from "@ocean/OceanContext";
 import { buildDerivedWaves, sampleOceanYRaw } from "@ocean/oceanUtils/gerstner";
 
-const GRAVITY = 0.089;
-const DRIFT_FORCE = 0.015;
-const SPEED_DRAG = 0.992;  // half-life ~86 frames (1.4s)
+const DT = 1 / 60;          // s — fixed timestep
+const G = 9.81;              // m/s²
+const RHO_WATER = 1025;      // kg/m³ (seawater)
+const HD = 0.5;              // s⁻¹ — horizontal drag coefficient
+const BASE_WIND_SPEED = 5;   // m/s — reference wind speed for maxSpeed
+const DRIFT_FORCE = 0.9;     // m/s² — wave slope drift acceleration
 const GYRO = 0.4;
 const ANGULAR_ACCEL = 0.0012; // angular acceleration per frame from rudder
 const ANGULAR_DRAG = 0.85;   // angular velocity decay per frame
@@ -29,16 +32,17 @@ const CORNERS: [1 | -1, 1 | -1][] = [
 
 interface FloatingBodyProps {
   children: React.ReactNode;
-  width?: number;
-  length?: number;
-  draft?: number;
-  mass?: number;
-  waterDrag?: number;
-  stiffness?: number;
+  width?: number;       // m
+  length?: number;      // m
+  draft?: number;       // m — keel depth offset (positive = hull center above waterline)
+  mass?: number;        // kg
+  waterDrag?: number;   // s⁻¹ — vertical & angular damping coefficient
+  stiffness?: number;   // angular spring stiffness (unitless, tuning param)
+  maxSpeed?: number;    // m/s — terminal speed at BASE_WIND_SPEED, full sails, 0° angle
   position?: [number, number];
   initialHeading?: number;
   modelYaw?: number;
-  thrustRef: React.RefObject<number>;
+  sailLevelRef: React.RefObject<number>;
   steeringRef: React.RefObject<number>;
   transformRef?: React.RefObject<BoatTransform>;
   windAngleRef?: React.RefObject<number>;
@@ -50,13 +54,14 @@ export default function FloatingBody({
   width = 4,
   length = 10,
   draft = 0.5,
-  mass = 1.0,
-  waterDrag = 0.08,
+  mass = 5000,
+  waterDrag = 1.2,
   stiffness = 0.08,
+  maxSpeed = 5,
   position = [0, 0],
   initialHeading = 0,
   modelYaw = 0,
-  thrustRef,
+  sailLevelRef,
   steeringRef,
   transformRef,
   windAngleRef,
@@ -125,8 +130,16 @@ export default function FloatingBody({
     const mean = (hBP + hBS + hSP + hSS) / 4;
 
     const targetY = mean - draft;
-    const targetPitch = Math.atan2(frontAvg - backAvg, length);
-    const targetRoll = Math.atan2(stbdAvg - portAvg, width);
+    // Hull plane normal from the 4 corner 3D positions — correct for coupled pitch+roll
+    const fwdX = 2 * bowX,  fwdY = frontAvg - backAvg, fwdZ = 2 * bowZ;
+    const rgtX = 2 * stbdX, rgtY = stbdAvg - portAvg,  rgtZ = 2 * stbdZ;
+    const nx = rgtY * fwdZ - rgtZ * fwdY;
+    const ny = rgtZ * fwdX - rgtX * fwdZ; // = width×length > 0
+    const nz = rgtX * fwdY - rgtY * fwdX;
+    const nFwd  = nx * cosH + nz * (-sinH);
+    const nRght = nx * sinH + nz *   cosH;
+    const targetPitch = Math.atan2(-nFwd,  ny);
+    const targetRoll  = Math.atan2( nRght, ny);
 
     // Wind-induced roll — only when wind is near-perpendicular to heading (±10°)
     const windAngle = windAngleRef?.current ?? 0;
@@ -138,41 +151,50 @@ export default function FloatingBody({
       finalTargetRoll += Math.sign(sinA) * WIND_ROLL_EXTRA * windFactor;
     }
 
-    // Low-pass filter on angular targets before spring (reduces choppiness)
+    // ── Angular spring (DT-integrated) ──────────────────────────────────────
     smoothPitch.current += (targetPitch - smoothPitch.current) * ANGULAR_SMOOTH;
     smoothRoll.current += (finalTargetRoll - smoothRoll.current) * ANGULAR_SMOOTH;
 
     const speed = Math.hypot(velX.current, velZ.current);
     const gyroFactor = 1 / (1 + speed * GYRO);
     const effectiveStiffness = stiffness * gyroFactor;
+    const angDamp = Math.exp(-waterDrag * DT);
 
-    velPitch.current = velPitch.current * (1 - waterDrag) + (smoothPitch.current - pitch.current) * effectiveStiffness;
-    velRoll.current = velRoll.current * (1 - waterDrag) + (smoothRoll.current - roll.current) * effectiveStiffness;
+    velPitch.current = velPitch.current * angDamp + (smoothPitch.current - pitch.current) * effectiveStiffness * DT;
+    velRoll.current  = velRoll.current  * angDamp + (smoothRoll.current  - roll.current)  * effectiveStiffness * DT;
+    pitch.current += velPitch.current * DT;
+    roll.current  += velRoll.current  * DT;
 
-    velY.current -= GRAVITY / mass;
-    if (posY.current < targetY) {
-      velY.current += (targetY - posY.current) * stiffness / mass;
+    // ── Vertical physics (SI units) ──────────────────────────────────────────
+    velY.current -= G * DT;
+
+    const submersion = targetY - posY.current;
+    if (submersion > 0) {
+      const buoyAcc = (RHO_WATER * G * width * length * submersion) / mass;
+      velY.current += buoyAcc * DT;
     }
-    velY.current *= (1 - waterDrag);
+    velY.current *= Math.exp(-waterDrag * DT);
+    posY.current += velY.current * DT;
 
-    pitch.current += velPitch.current;
-    roll.current += velRoll.current;
-    posY.current += velY.current;
+    // ── Horizontal physics (SI units) ────────────────────────────────────────
+    const hDamp = Math.exp(-HD * DT);
+    velX.current *= hDamp;
+    velZ.current *= hDamp;
 
-    // ── Wave drift ───────────────────────────────────────────────────────────
-    const fwdDrift = -Math.sin(pitch.current) * DRIFT_FORCE;
-    const sideDrift = -Math.sin(roll.current) * DRIFT_FORCE;
+    // Wave-slope drift
+    velX.current += (-Math.sin(pitch.current) * cosH - Math.sin(roll.current) * sinH) * DRIFT_FORCE * DT;
+    velZ.current += ( Math.sin(pitch.current) * sinH - Math.sin(roll.current) * cosH) * DRIFT_FORCE * DT;
 
-    velX.current = velX.current * SPEED_DRAG + fwdDrift * cosH + sideDrift * sinH;
-    velZ.current = velZ.current * SPEED_DRAG - fwdDrift * sinH + sideDrift * cosH;
+    // Wind/sail thrust — terminal velocity = maxSpeed × windNorm × angularEff × sailFactor
+    const angularEff = 0.75 + 0.25 * Math.cos((windAngleRef?.current ?? 0) - headingRef.current);
+    const sailFactor = sailLevelRef.current / 3;
+    const windNorm = Math.min((windSpeedRef?.current ?? 0) / BASE_WIND_SPEED, 2.0);
+    const thrustAcc = HD * maxSpeed * windNorm * angularEff * sailFactor;
+    velX.current += thrustAcc * DT * cosH;
+    velZ.current += thrustAcc * DT * -sinH;
 
-    // ── Wind thrust — forward force in heading direction ─────────────────────
-    const thrust = thrustRef.current;
-    velX.current += thrust * cosH;
-    velZ.current += thrust * -sinH;
-
-    posX.current += velX.current;
-    posZ.current += velZ.current;
+    posX.current += velX.current * DT;
+    posZ.current += velZ.current * DT;
 
     // ── Apply to Three.js groups directly — zero lag, no physics engine step ─
     if (posRef.current) {

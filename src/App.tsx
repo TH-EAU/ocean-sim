@@ -7,7 +7,7 @@ import Terrain from "./components/terrain/Terrain";
 import Ocean from "./components/ocean/Ocean";
 import BoatCamera from "./components/pawn/BoatCamera";
 import BoatHUD from "./components/pawn/BoatHUD";
-import OceanWaveDebug from "./components/ocean/OceanWaveDebug";
+import WorldDebugGrid from "./components/ocean/WorldDebugGrid";
 import SceneLighting from "./components/graphics/SceneLighting";
 import BakedSky from "./components/sky/BakedSky";
 import { BoatProvider, useBoat } from "./contexts/BoatContext";
@@ -16,22 +16,22 @@ const BASE_WIND_SPEED = 5;
 // Waves are defined in src/components/ocean/oceanConsts.ts → DEFAULT_WAVE_LAYERS
 
 function BoatWithControls() {
-  const { thrustRef, steeringRef, transformRef, windAngleRef, windSpeedRef } = useBoat();
+  const { sailLevelRef, steeringRef, transformRef, windAngleRef, windSpeedRef } = useBoat();
   return (
     <FloatingBody
       width={6}
       length={20}
       draft={-1.1}
-      mass={50.0}
-      waterDrag={0.08}
+      mass={5000}
+      waterDrag={1.2}
+      maxSpeed={5}
       position={[0, 0]}
       initialHeading={Math.PI}
-      thrustRef={thrustRef}
+      sailLevelRef={sailLevelRef}
       steeringRef={steeringRef}
       transformRef={transformRef}
       windAngleRef={windAngleRef}
       windSpeedRef={windSpeedRef}
-      stiffness={.2}
     >
       <Boat scale={0.01} position={[5, 0, 0]} />
     </FloatingBody>
@@ -65,7 +65,7 @@ export default function App() {
               windSpeedRef={windSpeedRef}
             >
               <BoatWithControls />
-              <OceanWaveDebug />
+              <WorldDebugGrid />
             </Ocean>
             <BoatCamera
               orbitControlsRef={orbitControlsRef}

@@ -1,8 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { BoatTransform } from "../types/boat";
 
-const THRUST_SCALE = 0.0015;
-const MAX_THROTTLE = 3;
+const MAX_SAIL_LEVEL = 3;
 
 export interface WindDisplay {
   speed: number;
@@ -10,7 +9,7 @@ export interface WindDisplay {
 }
 
 export interface BoatContextValue {
-  thrustRef: React.RefObject<number>;
+  sailLevelRef: React.RefObject<number>;
   steeringRef: React.RefObject<number>;
   windAngleRef: React.RefObject<number>;
   windSpeedRef: React.RefObject<number>;
@@ -35,7 +34,7 @@ interface BoatProviderProps {
 }
 
 export function BoatProvider({ children, windAngleRef, windSpeedRef }: BoatProviderProps) {
-  const thrustRef = useRef<number>(0);
+  const sailLevelRef = useRef<number>(0);
   const steeringRef = useRef<number>(0);
   const transformRef = useRef<BoatTransform>({ x: 0, y: 0, z: 0, heading: 0 });
 
@@ -43,7 +42,6 @@ export function BoatProvider({ children, windAngleRef, windSpeedRef }: BoatProvi
   const [cameraMode, setCameraMode] = useState<"follow" | "orbit">("follow");
   const [windDisplay, setWindDisplay] = useState<WindDisplay>({ speed: 0, angle: 0 });
 
-  // Stable ref to current throttle level — avoids stale closures in event handlers
   const throttleRef = useRef(0);
   throttleRef.current = throttleLevel;
 
@@ -52,15 +50,15 @@ export function BoatProvider({ children, windAngleRef, windSpeedRef }: BoatProvi
       if (e.repeat) return;
       switch (e.key.toLowerCase()) {
         case "z": {
-          const next = Math.min(MAX_THROTTLE, throttleRef.current + 1);
+          const next = Math.min(MAX_SAIL_LEVEL, throttleRef.current + 1);
           setThrottleLevel(next);
-          thrustRef.current = (windSpeedRef.current ?? 5) * (next / MAX_THROTTLE) * THRUST_SCALE;
+          sailLevelRef.current = next;
           break;
         }
         case "s": {
           const next = Math.max(0, throttleRef.current - 1);
           setThrottleLevel(next);
-          thrustRef.current = (windSpeedRef.current ?? 5) * (next / MAX_THROTTLE) * THRUST_SCALE;
+          sailLevelRef.current = next;
           break;
         }
         case "d": steeringRef.current = -1; break;
@@ -81,20 +79,18 @@ export function BoatProvider({ children, windAngleRef, windSpeedRef }: BoatProvi
       window.removeEventListener("keydown", onKeyDown);
       window.removeEventListener("keyup", onKeyUp);
     };
-  }, [windSpeedRef]);
+  }, []);
 
-  // Update thrust dynamically as wind speed varies + refresh HUD at 10 fps
+  // Refresh HUD wind display at 10 fps
   useEffect(() => {
     const id = setInterval(() => {
-      const spd = windSpeedRef.current ?? 0;
-      thrustRef.current = spd * (throttleRef.current / MAX_THROTTLE) * THRUST_SCALE;
-      setWindDisplay({ speed: spd, angle: windAngleRef.current ?? 0 });
-    }, 200);
+      setWindDisplay({ speed: windSpeedRef.current ?? 0, angle: windAngleRef.current ?? 0 });
+    }, 100);
     return () => clearInterval(id);
   }, [windAngleRef, windSpeedRef]);
 
   const value: BoatContextValue = {
-    thrustRef,
+    sailLevelRef,
     steeringRef,
     windAngleRef,
     windSpeedRef,

@@ -5,7 +5,7 @@ import type { GerstnerWave } from "@/src/types/waveConfig";
 
 export const TERRAIN_BOUNDS = new THREE.Vector4(-30, -30, 30, 30);
 
-export const SUN_DIR: [number, number, number] = [100, 10, 100];
+export const SUN_DIR: [number, number, number] = [100, 100, 100];
 
 // LOD
 export const LOD: OceanLOD = {

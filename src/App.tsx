@@ -4,6 +4,8 @@ import Ocean from "./components/ocean/Ocean";
 import Scene from "./components/graphics/Scene";
 import { OceanProvider } from "./contexts/OceanContext";
 import Boat from "./components/boat/Boat";
+import Test from "./components/Test";
+import { MeshStandardMaterial } from "three";
 // import FloatingBody from "./components/physics/FloatingBody";
 
 
@@ -45,11 +47,21 @@ export default function App() {
     <div style={{ width: "100vw", height: "100vh" }}>
       <Scene>
         <Suspense fallback={null}>
-          <OceanProvider>
+          <mesh castShadow receiveShadow >
+            <boxGeometry />
+            <meshStandardMaterial />
+          </mesh>
+
+          <mesh rotation={[250, 0, 0]} position={[0, -1, 0]} receiveShadow>
+            <planeGeometry args={[100, 100]} />
+            <meshStandardMaterial color="gray" />
+          </mesh>
+          {/* <OceanProvider>
             <Ocean />
-            {/* <FloatingBody width={10} length={10} posXRef={posXRef} posZRef={posZRef} headingRef={headingRef} /> */}
+            <FloatingBody width={10} length={10} posXRef={posXRef} posZRef={posZRef} headingRef={headingRef} /> 
             <Boat />
-          </OceanProvider>
+          </OceanProvider> */}
+          <Test />
         </Suspense>
         <Stats />
       </Scene>

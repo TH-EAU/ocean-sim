@@ -6,6 +6,7 @@ import { OceanProvider } from "./contexts/OceanContext";
 import Boat from "./components/boat/Boat";
 import Test from "./components/Test";
 import { MeshStandardMaterial } from "three";
+import Terrain from "./components/terrain/Terrain";
 // import FloatingBody from "./components/physics/FloatingBody";
 
 
@@ -48,14 +49,15 @@ export default function App() {
       <Scene>
         <Suspense fallback={null}>
           <mesh castShadow receiveShadow >
-            <boxGeometry />
+            <boxGeometry args={[1, 20]} />
             <meshStandardMaterial />
           </mesh>
 
-          <mesh rotation={[250, 0, 0]} position={[0, -1, 0]} receiveShadow>
+          {/* <mesh rotation={[250, 0, 0]} position={[0, -1, 0]} receiveShadow>
             <planeGeometry args={[100, 100]} />
             <meshStandardMaterial color="gray" />
-          </mesh>
+          </mesh> */}
+          <Terrain heightScale={50} terrainDepth={-20} />
           {/* <OceanProvider>
             <Ocean />
             <FloatingBody width={10} length={10} posXRef={posXRef} posZRef={posZRef} headingRef={headingRef} /> 

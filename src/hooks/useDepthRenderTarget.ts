@@ -2,14 +2,16 @@
 import { useMemo, useEffect } from 'react';
 import * as THREE from 'three';
 
-export function useDepthRenderTarget() {
-    return useMemo(() => {
-        const depthTexture = new THREE.DepthTexture(0, 0);
+export function useDepthRenderTarget(width: number, height: number) {
+    const rt = useMemo(() => {
+        const depthTexture = new THREE.DepthTexture(width, height);
         depthTexture.type = THREE.UnsignedShortType;
 
-        return new THREE.WebGLRenderTarget(0, 0, {
+        return new THREE.WebGLRenderTarget(width, height, {
             depthTexture,
             depthBuffer: true,
         });
-    }, []);
+    }, [width, height]); // se recrée si la taille change
+
+    return rt;
 }

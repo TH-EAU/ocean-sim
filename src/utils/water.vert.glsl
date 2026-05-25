@@ -3,6 +3,10 @@ varying vec3 vWorldPosition;
 varying float vElevation;
 
 varying vec3 vViewDir;
+uniform float uTime;
+
+varying vec4 vScreenPos;
+varying vec3 vNormal;
 
 vec3 gerstnerWave(
     vec3 pos,
@@ -12,7 +16,7 @@ vec3 gerstnerWave(
     float speed,
     float Q
 ) {
-    float phi = freq * dot(dir, pos.xy) + speed; // xy : plan local avant rotation
+    float phi = freq * dot(dir, pos.xy) + speed * uTime; // xy : plan local avant rotation
     float sinPhi = sin(phi);
     float cosPhi = cos(phi);
 
@@ -30,7 +34,7 @@ vec3 gerstnerNormal(
     float speed,
     float Q
 ) {
-    float phi = freq * dot(dir, pos.xy) + speed;
+    float phi = freq * dot(dir, pos.xy) + speed * uTime;
     float sinPhi = sin(phi);
     float cosPhi = cos(phi);
     float WA = freq * amp;
@@ -40,6 +44,8 @@ vec3 gerstnerNormal(
 }
 
 void main() {
+    // vertex
+
     vUv = uv;
     vec3 pos = position;
 
@@ -49,6 +55,7 @@ void main() {
     vec2 d1 = normalize(vec2(1.0, 0.2));
     disp += gerstnerWave(pos, d1, 1.0, 0.15, 0.8, 5.5);
     nAccum += gerstnerNormal(pos, d1, 1.0, 0.15, 0.8, 5.5);
+    vNormal = normalize(nAccum);
 
     pos += disp;
     vElevation = disp.z; // Z local = hauteur monde
@@ -56,6 +63,6 @@ void main() {
     vec4 worldPos4 = modelMatrix * vec4(pos, 1.0);
     vWorldPosition = worldPos4.xyz;
     vViewDir = cameraPosition - vWorldPosition;
-
+    vScreenPos = projectionMatrix * viewMatrix * worldPos4;
     gl_Position = projectionMatrix * viewMatrix * worldPos4;
 }

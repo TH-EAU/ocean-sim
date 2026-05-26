@@ -4,139 +4,93 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { useDepthRenderTarget } from "../hooks/useDepthRenderTarget"
-import normalMapUrl from "../assets/Water 0341normal.jpg?url";
-import { useDepthBuffer, useTexture } from "@react-three/drei"
-import heightmapUrl from "@assets/heightmap.jpg?url";
-import { useFBO } from '@react-three/drei'
+import { useTexture } from "@react-three/drei"
+import normalMapUrl from "../assets/Water 0341normal.jpg?url"
+import heightmapUrl from "@assets/heightmap.jpg?url"
 
-const Test = () => {
-    const { gl, scene, camera, size: canvasSize } = useThree() // size.width / size.height
+const clipPlane = new THREE.Plane(new THREE.Vector3(0, -1, 0), 1.5)
+
+const Water = () => {
+    const { gl, scene, camera, size } = useThree()
     const matRef = useRef<THREE.ShaderMaterial>(null)
-    const meshRef = useRef<THREE.Mesh>(null);
-    const depthRT = useDepthRenderTarget(canvasSize.width, canvasSize.height)
+    const meshRef = useRef<THREE.Mesh>(null)
 
     const normalMap = useTexture(normalMapUrl, (tex) => {
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        tex.minFilter = THREE.LinearMipmapLinearFilter;
-        tex.needsUpdate = true;
-    });
-
-
-
-    const refractionTarget = useDepthRenderTarget(canvasSize.width, canvasSize.height)
-
-    // ── Texture de caustiques procédurale ─────────────────────
-    const causticsTex = useMemo(() => {
-        const size = 256;
-        const data = new Uint8Array(size * size * 4);
-        for (let i = 0; i < size * size; i++) {
-            const x = (i % size) / size;
-            const y = Math.floor(i / size) / size;
-            // Voronoï simplifié pour les caustiques
-            let minDist = 1.0;
-            for (let j = 0; j < 8; j++) {
-                const cx = (Math.sin(j * 2.399) * 0.5 + 0.5);
-                const cy = (Math.cos(j * 3.141) * 0.5 + 0.5);
-                const dx = x - cx;
-                const dy = y - cy;
-                minDist = Math.min(minDist, Math.sqrt(dx * dx + dy * dy));
-            }
-            const v = Math.floor(Math.pow(1.0 - minDist * 2.0, 3.0) * 255);
-            const bright = Math.max(0, v);
-            data[i * 4 + 0] = bright;
-            data[i * 4 + 1] = bright;
-            data[i * 4 + 2] = bright;
-            data[i * 4 + 3] = 255;
-        }
-        const tex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-        tex.needsUpdate = true;
-        return tex;
-    }, []);
-
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+        tex.minFilter = THREE.LinearMipmapLinearFilter
+    })
 
     const heightmap = useTexture(heightmapUrl, (tex) => {
-        tex.minFilter = THREE.LinearFilter;
-        tex.generateMipmaps = false;
-        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping;
-        tex.needsUpdate = true;
-    });
+        tex.minFilter = THREE.LinearFilter
+        tex.generateMipmaps = false
+        tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping
+    })
+
+    const dpr = gl.getPixelRatio()
+    const refractionTarget = useDepthRenderTarget(size.width * dpr, size.height * dpr)
 
     const uniforms = useMemo<Record<string, THREE.IUniform>>(() => ({
         uTime: { value: 0 },
-        // Fragment
-        uResolution: {
-            value: gl.getDrawingBufferSize(new THREE.Vector2()),
+        uResolution: { value: new THREE.Vector2(size.width * dpr, size.height * dpr) },
+        uProjectionMatrixInverse: { value: new THREE.Matrix4() },
+        uViewMatrixInverse: { value: new THREE.Matrix4() },
 
-        },
-        uProjectionMatrixInverse: { value: camera.projectionMatrixInverse },
-        uViewMatrixInverse: { value: camera.matrixWorld },
+        uNormalMap: { value: normalMap },
+        depthSampler: { value: heightmap },
+        uRefractionTex: { value: refractionTarget.texture },
         uDepthTexture: { value: refractionTarget.depthTexture },
 
-        uWaterColor: { value: new THREE.Color(0.361, 0.867, 0.690) },
-        uWaterClarity: { value: 0.6 },
-        uExtinctionColor: { value: new THREE.Color(0.000, 0.243, 0.486) },
-        uFresnelBias: { value: 0.02 },   // R0 physique ≈ 0.02 pour eau
-        uFresnelScale: { value: 0.98 },
-        uFresnelPower: { value: 5.0 },
-
-        uNear: { value: 0.1 },
-        uFar: { value: 100.0 },
-        uNormalMap: { value: normalMap },
-        uCausticsTex: { value: causticsTex },
-        uRefractionTex: { value: refractionTarget.texture },
-        depthSampler: { value: heightmap },
-        uWaterDepth: { value: 10.0 },  // profondeur réelle du terrain en unités monde
-        uWaterScale: { value: 1.0 },  // échelle de normalisation — tweakable indépendamment
-        uPixelRatio: { value: window.devicePixelRatio },
-        uTerrainOffset: { value: new THREE.Vector2(-300, -300) }, // la moitié de ta taille
-        uTerrainSize: { value: new THREE.Vector2(600, 600) }, // taille de ton plane terrain
-
-        uMaxThickness: { value: 3.0 },
+        uTerrainOffset: { value: new THREE.Vector2(-300, -300) },
+        uTerrainSize: { value: new THREE.Vector2(600, 600) },
         uHeightScale: { value: 10 },
 
+        uMaxThickness: { value: 3.0 },
         uExtinctionCoeff: { value: new THREE.Vector3(1.0, 0.5, 0.1) },
         uWaterDensity: { value: 0.1 },
-        uDepthDensityScale: { value: .2 }
+        uDepthDensityScale: { value: 0.2 },
 
-    }), [heightmap]);
+        uFresnelBias: { value: 0.02 },
+        uFresnelScale: { value: 0.98 },
+        uFresnelPower: { value: 5.0 },
+    }), [heightmap, normalMap])
 
     useFrame(({ camera, size, clock }) => {
-        if (!matRef.current) return;
-        matRef.current.uniforms.uTime.value = clock.getElapsedTime();
-        uniforms.uTime.value = clock.getElapsedTime();
-        uniforms.uResolution.value.set(size.width, size.height);
-        uniforms.uNear.value = (camera as THREE.PerspectiveCamera).near;
-        uniforms.uFar.value = (camera as THREE.PerspectiveCamera).far;
-        uniforms.uProjectionMatrixInverse.value.copy(camera.projectionMatrixInverse);
-        uniforms.uViewMatrixInverse.value.copy(camera.matrixWorld);
+        const mat = matRef.current
+        if (!mat) return
 
-        // Render réfraction — scène sans la surface d'eau
-        if (meshRef.current) meshRef.current.visible = false;
-        gl.setRenderTarget(refractionTarget);
-        gl.clear();
-        gl.render(scene, camera);
-        gl.setRenderTarget(null);
-        if (meshRef.current) meshRef.current.visible = true;
-    }, -1);
+        const dpr = gl.getPixelRatio()
 
+        mat.uniforms.uTime.value = clock.getElapsedTime()
+        mat.uniforms.uResolution.value.set(size.width * dpr, size.height * dpr)
+        mat.uniforms.uProjectionMatrixInverse.value.copy(camera.projectionMatrixInverse)
+        mat.uniforms.uViewMatrixInverse.value.copy(camera.matrixWorld)
 
+        if (meshRef.current) meshRef.current.visible = false
+        gl.clippingPlanes = [clipPlane]
+        gl.localClippingEnabled = true
+        gl.setRenderTarget(refractionTarget)
+        gl.clear()
+        gl.render(scene, camera)
+        gl.setRenderTarget(null)
+        gl.clippingPlanes = []
+        gl.localClippingEnabled = false
+        if (meshRef.current) meshRef.current.visible = true
+    }, -1)
 
     return (
-
-        <mesh rotation={[-Math.PI / 2, 0, 0]} ref={meshRef}>
+        <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]}>
             <planeGeometry args={[600, 600, 256, 256]} />
+
             <shaderMaterial
                 ref={matRef}
                 uniforms={uniforms}
                 fragmentShader={fragment}
                 vertexShader={vertex}
                 transparent
-
                 depthWrite
             />
         </mesh>
     )
 }
 
-export default Test;
+export default Water

@@ -31,6 +31,7 @@ const Scene: React.FC<{ children: ReactNode }> = ({ children }) => {
             <OrbitControls
                 ref={orbitControlsRef}
                 enableDamping
+                zoom0={10}
                 dampingFactor={0.08}
                 minDistance={3}
                 maxDistance={1145}
